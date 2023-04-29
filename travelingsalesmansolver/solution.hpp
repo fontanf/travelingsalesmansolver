@@ -37,6 +37,9 @@ public:
     /** Get the number of vertices in the solution. */
     inline VertexId number_of_vertices() const { return vertex_ids_.size(); }
 
+    /** Get the id of the vertex at a given position. */
+    inline VertexId vertex_id(VertexPos pos) const { return vertex_ids_[pos]; }
+
     /** Get the full distance of the solution. */
     inline Distance distance() const { return distance_; }
 
