@@ -19,7 +19,7 @@ using Counter = int64_t;
 /*
  * Structure for a location.
  */
-struct Location
+struct Vertex
 {
     /** x-coordinate of the location. */
     double x;
@@ -45,27 +45,15 @@ public:
 
     /** Constructor to build an instance manually. */
     Instance(VertexId number_of_vertices):
-        locations_(number_of_vertices),
+        vertices_(number_of_vertices),
         distances_(number_of_vertices, std::vector<Distance>(number_of_vertices, -1))
     {
         for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id)
             distances_[vertex_id][vertex_id] = 0;
     }
 
-    /** Set the coordinates of a vertex. */
-    void set_xy(
-            VertexId vertex_id,
-            double x,
-            double y,
-            double z = -1)
-    {
-        locations_[vertex_id].x = x;
-        locations_[vertex_id].y = y;
-        locations_[vertex_id].z = z;
-    }
-
     /** Set the distance between two vertices. */
-    void set_distance(
+    inline void set_distance(
             VertexId vertex_id_1,
             VertexId vertex_id_2,
             Distance distance)
@@ -73,6 +61,30 @@ public:
         distances_[vertex_id_1][vertex_id_2] = distance;
         distances_[vertex_id_2][vertex_id_1] = distance;
         distance_max_ = std::max(distance_max_, distance);
+    }
+
+    /** Set the coordinates of a vertex. */
+    void set_coordinates(
+            VertexId vertex_id,
+            double x,
+            double y,
+            double z = -1)
+    {
+        vertices_[vertex_id].x = x;
+        vertices_[vertex_id].y = y;
+        vertices_[vertex_id].z = z;
+    }
+
+    /** Set the edge weight type. */
+    void set_edge_weight_type(std::string edge_weight_type)
+    {
+        edge_weight_type_ = edge_weight_type;
+    }
+
+    /** Set the node coord type. */
+    void set_node_coord_type(std::string node_coord_type)
+    {
+        node_coord_type_ = node_coord_type;
     }
 
     /** Build an instance from a file. */
@@ -85,13 +97,16 @@ public:
      */
 
     /** Get the number of vertices. */
-    inline VertexId number_of_vertices() const { return locations_.size(); }
+    inline VertexId number_of_vertices() const { return vertices_.size(); }
+
+    /** Get a vertex. */
+    inline const Vertex& vertex(VertexId vertex_id) const { return vertices_[vertex_id]; }
 
     /** Get the x-coordinate of a vertex. */
-    inline double x(VertexId vertex_id) const { return locations_[vertex_id].x; }
+    inline double x(VertexId vertex_id) const { return vertices_[vertex_id].x; }
 
     /** Get the y-coordinate of a vertex. */
-    inline double y(VertexId vertex_id) const { return locations_[vertex_id].y; }
+    inline double y(VertexId vertex_id) const { return vertices_[vertex_id].y; }
 
     /** Get the distance between two vertices. */
     inline Distance distance(
@@ -135,10 +150,10 @@ private:
      * Private attributes
      */
 
-    /** Locations. */
-    std::vector<Location> locations_;
+    /** Vertices. */
+    std::vector<Vertex> vertices_;
 
-    /** Distances between locations. */
+    /** Distances between vertices. */
     std::vector<std::vector<Distance>> distances_;
 
     /*
@@ -147,6 +162,20 @@ private:
 
     /** Maximum distance. */
     Distance distance_max_ = 0;
+
+    /**
+     * Edge weight type.
+     *
+     * See http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp95.pdf
+     */
+    std::string edge_weight_type_ = "EXPLICIT";
+
+    /**
+     * Node coord type.
+     *
+     * See http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp95.pdf
+     */
+    std::string node_coord_type_ = "TWOD_COORDS";
 
 };
 

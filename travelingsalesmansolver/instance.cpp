@@ -26,9 +26,7 @@ void Instance::read_tsplib(std::ifstream& file)
 {
     std::string tmp;
     std::vector<std::string> line;
-    std::string edge_weight_type;
     std::string edge_weight_format;
-    std::string node_coord_type = "TWOD_COORDS";
     while (getline(file, tmp)) {
         line = optimizationtools::split(tmp, ' ');
         if (line.size() == 0) {
@@ -38,14 +36,14 @@ void Instance::read_tsplib(std::ifstream& file)
         } else if (tmp.rfind("DISPLAY_DATA_TYPE", 0) == 0) {
         } else if (tmp.rfind("DIMENSION", 0) == 0) {
             VertexId n = std::stol(line.back());
-            locations_ = std::vector<Location>(n);
+            vertices_ = std::vector<Vertex>(n);
             distances_ = std::vector<std::vector<Distance>>(n, std::vector<Distance>(n, -1));
         } else if (tmp.rfind("EDGE_WEIGHT_TYPE", 0) == 0) {
-            edge_weight_type = line.back();
+            edge_weight_type_ = line.back();
         } else if (tmp.rfind("EDGE_WEIGHT_FORMAT", 0) == 0) {
             edge_weight_format = line.back();
         } else if (tmp.rfind("NODE_COORD_TYPE", 0) == 0) {
-            node_coord_type = line.back();
+            node_coord_type_ = line.back();
         } else if (tmp.rfind("EDGE_WEIGHT_SECTION", 0) == 0) {
             if (edge_weight_format == "UPPER_ROW") {
                 Distance d;
@@ -111,23 +109,23 @@ void Instance::read_tsplib(std::ifstream& file)
                 std::cerr << "\033[31m" << "ERROR, EDGE_WEIGHT_FORMAT \"" << edge_weight_format << "\" not implemented." << "\033[0m" << std::endl;
             }
         } else if (tmp.rfind("NODE_COORD_SECTION", 0) == 0) {
-            if (node_coord_type == "TWOD_COORDS") {
+            if (node_coord_type_ == "TWOD_COORDS") {
                 VertexId tmp;
                 double x, y;
                 for (VertexId vertex_id = 0;
                         vertex_id < number_of_vertices();
                         ++vertex_id) {
                     file >> tmp >> x >> y;
-                    set_xy(vertex_id, x, y);
+                    set_coordinates(vertex_id, x, y);
                 }
-            } else if (node_coord_type == "THREED_COORDS") {
+            } else if (node_coord_type_ == "THREED_COORDS") {
                 VertexId tmp;
                 double x, y, z;
                 for (VertexId vertex_id = 0;
                         vertex_id < number_of_vertices();
                         ++vertex_id) {
                     file >> tmp >> x >> y >> z;
-                    set_xy(vertex_id, x, y, z);
+                    set_coordinates(vertex_id, x, y, z);
                 }
             }
         } else if (tmp.rfind("DISPLAY_DATA_SECTION", 0) == 0) {
@@ -137,7 +135,7 @@ void Instance::read_tsplib(std::ifstream& file)
                     vertex_id < number_of_vertices();
                     ++vertex_id) {
                 file >> tmp >> x >> y;
-                set_xy(vertex_id, x, y);
+                set_coordinates(vertex_id, x, y);
             }
         } else if (tmp.rfind("EOF", 0) == 0) {
             break;
@@ -147,7 +145,7 @@ void Instance::read_tsplib(std::ifstream& file)
     }
 
     // Compute distances.
-    if (edge_weight_type == "EUC_2D") {
+    if (edge_weight_type_ == "EUC_2D") {
         for (VertexId vertex_id_1 = 0;
                 vertex_id_1 < number_of_vertices();
                 ++vertex_id_1) {
@@ -160,7 +158,7 @@ void Instance::read_tsplib(std::ifstream& file)
                 set_distance(vertex_id_1, vertex_id_2, d);
             }
         }
-    } else if (edge_weight_type == "CEIL_2D") {
+    } else if (edge_weight_type_ == "CEIL_2D") {
         for (VertexId vertex_id_1 = 0;
                 vertex_id_1 < number_of_vertices();
                 ++vertex_id_1) {
@@ -173,7 +171,7 @@ void Instance::read_tsplib(std::ifstream& file)
                 set_distance(vertex_id_1, vertex_id_2, d);
             }
         }
-    } else if (edge_weight_type == "GEO") {
+    } else if (edge_weight_type_ == "GEO") {
         std::vector<double> latitudes(number_of_vertices(), 0);
         std::vector<double> longitudes(number_of_vertices(), 0);
         for (VertexId vertex_id = 0;
@@ -201,7 +199,7 @@ void Instance::read_tsplib(std::ifstream& file)
                 set_distance(vertex_id_1, vertex_id_2, d);
             }
         }
-    } else if (edge_weight_type == "ATT") {
+    } else if (edge_weight_type_ == "ATT") {
         for (VertexId vertex_id_1 = 0;
                 vertex_id_1 < number_of_vertices();
                 ++vertex_id_1) {
@@ -216,9 +214,9 @@ void Instance::read_tsplib(std::ifstream& file)
                 set_distance(vertex_id_1, vertex_id_2, d);
             }
         }
-    } else if (edge_weight_type == "EXPLICIT") {
+    } else if (edge_weight_type_ == "EXPLICIT") {
     } else {
-        std::cerr << "\033[31m" << "ERROR, EDGE_WEIGHT_TYPE \"" << edge_weight_type << "\" not implemented." << "\033[0m" << std::endl;
+        std::cerr << "\033[31m" << "ERROR, EDGE_WEIGHT_TYPE \"" << edge_weight_type_ << "\" not implemented." << "\033[0m" << std::endl;
     }
     for (VertexId vertex_id = 0;
             vertex_id < number_of_vertices();
@@ -276,19 +274,47 @@ void Instance::write(std::string instance_path) const
     file << "COMMENT: generated by fontanf/travelingsalesmansolver" << std::endl;
     file << "TYPE: TSP" << std::endl;
     file << "DIMENSION: " << number_of_vertices() << std::endl;
-    file << "EDGE_WEIGHT_TYPE: EXPLICIT" << std::endl;
-    file << "EDGE_WEIGHT_FORMAT: UPPER_ROW" << std::endl;
-    file << "EDGE_WEIGHT_SECTION" << std::endl;
-    for (VertexId vertex_id_1 = 0;
-            vertex_id_1 < number_of_vertices() - 1;
-            ++vertex_id_1) {
-        for (VertexId vertex_id_2 = vertex_id_1 + 1;
-                vertex_id_2 < number_of_vertices();
-                ++vertex_id_2) {
-            file << distance(vertex_id_1, vertex_id_2) << " ";
+
+    file << "EDGE_WEIGHT_TYPE: " << edge_weight_type_ << std::endl;
+    if (edge_weight_type_ == "EXPLICIT") {
+        file << "EDGE_WEIGHT_FORMAT: UPPER_ROW" << std::endl;
+        file << "EDGE_WEIGHT_SECTION" << std::endl;
+        for (VertexId vertex_id_1 = 0;
+                vertex_id_1 < number_of_vertices() - 1;
+                ++vertex_id_1) {
+            for (VertexId vertex_id_2 = vertex_id_1 + 1;
+                    vertex_id_2 < number_of_vertices();
+                    ++vertex_id_2) {
+                file << distance(vertex_id_1, vertex_id_2) << " ";
+            }
+        }
+        file << std::endl;
+    }
+
+    file << "NODE_COORD_TYPE " << node_coord_type_ << std::endl;
+    if (node_coord_type_ == "TWOD_COORDS") {
+        file << "NODE_COORD_SECTION" << std::endl;
+        for (VertexId vertex_id = 0;
+                vertex_id < number_of_vertices();
+                ++vertex_id) {
+            const Vertex& vertex = this->vertex(vertex_id);
+            file << vertex_id + 1
+                << " " << vertex.x << " "
+                << vertex.y << std::endl;
+        }
+    } else if (node_coord_type_ == "THREED_COORDS") {
+        file << "NODE_COORD_SECTION" << std::endl;
+        for (VertexId vertex_id = 0;
+                vertex_id < number_of_vertices();
+                ++vertex_id) {
+            const Vertex& vertex = this->vertex(vertex_id);
+            file << vertex_id + 1 << " "
+                << vertex.x << " "
+                << vertex.y << " "
+                << vertex.z << std::endl;
         }
     }
-    file << std::endl;
+
     file << "EOF" << std::endl;
 }
 
