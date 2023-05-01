@@ -60,6 +60,11 @@ public:
      * Export.
      */
 
+    /** Print the instance. */
+    std::ostream& print(
+            std::ostream& os,
+            int verbose = 1) const;
+
     /** Write the solution to a file. */
     void write(std::string certificate_path) const;
 
@@ -120,6 +125,9 @@ struct Output
     /** Elapsed time. */
     double time = -1;
 
+    /** Return 'true' iff the solution is optimal. */
+    bool optimal() const { return solution.feasible() && solution.distance() == bound; }
+
     /** Print current state. */
     void print(
             optimizationtools::Info& info,
@@ -130,6 +138,16 @@ struct Output
             const Solution& solution_new,
             const std::stringstream& s,
             optimizationtools::Info& info);
+
+    /** Update the bound. */
+    void update_bound(
+            Distance bound_new,
+            const std::stringstream& s,
+            optimizationtools::Info& info);
+
+    /** Print the algorithm statistics. */
+    virtual void print_statistics(
+            optimizationtools::Info& info) const { (void)info; }
 
     /** Method to call at the end of the algorithm. */
     Output& algorithm_end(optimizationtools::Info& info);

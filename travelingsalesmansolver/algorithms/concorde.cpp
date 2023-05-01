@@ -61,7 +61,7 @@ Output travelingsalesmansolver::concorde(
     std::stringstream ss;
     ss << "final solution";
     output.update_solution(solution, ss, info);
-    //output.update_bound(solution.distance(), ss, info);
+    output.update_bound(solution.distance(), ss, info);
 
     return output.algorithm_end(info);
 }
