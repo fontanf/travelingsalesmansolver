@@ -44,6 +44,8 @@ Output travelingsalesmansolver::lkh(
         parameters_file << "RUNS = " << parameters.runs << std::endl;
     if (!parameters.max_trials.empty())
         parameters_file << "MAX_TRIALS = " << parameters.max_trials << std::endl;
+    if (!parameters.seed.empty())
+        parameters_file << "SEED = " << parameters.seed << std::endl;
 
     // Run.
     char output_path[L_tmpnam];

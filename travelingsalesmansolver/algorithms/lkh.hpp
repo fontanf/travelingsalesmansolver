@@ -19,6 +19,9 @@ struct LkhOptionalParameters
     /** MAX_TRIALS */
     std::string max_trials;
 
+    /** SEED */
+    std::string seed;
+
     /** Info structure. */
     optimizationtools::Info info = optimizationtools::Info();
 };
