@@ -46,63 +46,63 @@ void Instance::read_tsplib(std::ifstream& file)
             node_coord_type_ = line.back();
         } else if (tmp.rfind("EDGE_WEIGHT_SECTION", 0) == 0) {
             if (edge_weight_format == "UPPER_ROW") {
-                Distance d;
+                Distance distance;
                 for (VertexId vertex_id_1 = 0;
                         vertex_id_1 < number_of_vertices() - 1;
                         ++vertex_id_1) {
                     for (VertexId vertex_id_2 = vertex_id_1 + 1;
                             vertex_id_2 < number_of_vertices();
                             ++vertex_id_2) {
-                        file >> d;
-                        set_distance(vertex_id_1, vertex_id_2, d);
+                        file >> distance;
+                        set_distance(vertex_id_1, vertex_id_2, distance);
                     }
                 }
             } else if (edge_weight_format == "LOWER_ROW") {
-                Distance d;
+                Distance distance;
                 for (VertexId vertex_id_1 = 1;
                         vertex_id_1 < number_of_vertices();
                         ++vertex_id_1) {
                     for (VertexId vertex_id_2 = 0;
                             vertex_id_2 < vertex_id_1;
                             ++vertex_id_2) {
-                        file >> d;
-                        set_distance(vertex_id_1, vertex_id_2, d);
+                        file >> distance;
+                        set_distance(vertex_id_1, vertex_id_2, distance);
                     }
                 }
             } else if (edge_weight_format == "UPPER_DIAG_ROW") {
-                Distance d;
+                Distance distance;
                 for (VertexId vertex_id_1 = 0;
                         vertex_id_1 < number_of_vertices();
                         ++vertex_id_1) {
                     for (VertexId vertex_id_2 = vertex_id_1;
                             vertex_id_2 < number_of_vertices();
                             ++vertex_id_2) {
-                        file >> d;
-                        set_distance(vertex_id_1, vertex_id_2, d);
+                        file >> distance;
+                        set_distance(vertex_id_1, vertex_id_2, distance);
                     }
                 }
             } else if (edge_weight_format == "LOWER_DIAG_ROW") {
-                Distance d;
+                Distance distance;
                 for (VertexId vertex_id_1 = 0;
                         vertex_id_1 < number_of_vertices();
                         ++vertex_id_1) {
                     for (VertexId vertex_id_2 = 0;
                             vertex_id_2 <= vertex_id_1;
                             ++vertex_id_2) {
-                        file >> d;
-                        set_distance(vertex_id_1, vertex_id_2, d);
+                        file >> distance;
+                        set_distance(vertex_id_1, vertex_id_2, distance);
                     }
                 }
             } else if (edge_weight_format == "FULL_MATRIX") {
-                Distance d;
+                Distance distance;
                 for (VertexId vertex_id_1 = 0;
                         vertex_id_1 < number_of_vertices();
                         ++vertex_id_1) {
                     for (VertexId vertex_id_2 = 0;
                             vertex_id_2 < number_of_vertices();
                             ++vertex_id_2) {
-                        file >> d;
-                        set_distance(vertex_id_1, vertex_id_2, d);
+                        file >> distance;
+                        set_distance(vertex_id_1, vertex_id_2, distance);
                     }
                 }
             } else {
@@ -145,6 +145,7 @@ void Instance::read_tsplib(std::ifstream& file)
     }
 
     // Compute distances.
+    /*
     if (edge_weight_type_ == "EUC_2D") {
         for (VertexId vertex_id_1 = 0;
                 vertex_id_1 < number_of_vertices();
@@ -154,8 +155,8 @@ void Instance::read_tsplib(std::ifstream& file)
                     ++vertex_id_2) {
                 double xd = x(vertex_id_2) - x(vertex_id_1);
                 double yd = y(vertex_id_2) - y(vertex_id_1);
-                Distance d = std::round(std::sqrt(xd * xd + yd * yd));
-                set_distance(vertex_id_1, vertex_id_2, d);
+                Distance distance = std::round(std::sqrt(xd * xd + yd * yd));
+                set_distance(vertex_id_1, vertex_id_2, distance);
             }
         }
     } else if (edge_weight_type_ == "CEIL_2D") {
@@ -167,23 +168,23 @@ void Instance::read_tsplib(std::ifstream& file)
                     ++vertex_id_2) {
                 double xd = x(vertex_id_2) - x(vertex_id_1);
                 double yd = y(vertex_id_2) - y(vertex_id_1);
-                Distance d = std::ceil(std::sqrt(xd * xd + yd * yd));
-                set_distance(vertex_id_1, vertex_id_2, d);
+                Distance distance = std::ceil(std::sqrt(xd * xd + yd * yd));
+                set_distance(vertex_id_1, vertex_id_2, distance);
             }
         }
     } else if (edge_weight_type_ == "GEO") {
-        std::vector<double> latitudes(number_of_vertices(), 0);
-        std::vector<double> longitudes(number_of_vertices(), 0);
+        latitudes_ = std::vector<double>(number_of_vertices(), 0);
+        longitudes_ = std::vector<double>(number_of_vertices(), 0);
         for (VertexId vertex_id = 0;
                 vertex_id < number_of_vertices();
                 ++vertex_id) {
             double pi = 3.141592;
             int deg_x = std::round(x(vertex_id));
             double min_x = x(vertex_id) - deg_x;
-            latitudes[vertex_id] = pi * (deg_x + 5.0 * min_x / 3.0) / 180.0;
+            latitudes_[vertex_id] = pi * (deg_x + 5.0 * min_x / 3.0) / 180.0;
             int deg_y = std::round(y(vertex_id));
             double min_y = y(vertex_id) - deg_y;
-            longitudes[vertex_id] = pi * (deg_y + 5.0 * min_y / 3.0) / 180.0;
+            longitudes_[vertex_id] = pi * (deg_y + 5.0 * min_y / 3.0) / 180.0;
         }
         double rrr = 6378.388;
         for (VertexId vertex_id_1 = 0;
@@ -192,11 +193,11 @@ void Instance::read_tsplib(std::ifstream& file)
             for (VertexId vertex_id_2 = vertex_id_1 + 1;
                     vertex_id_2 < number_of_vertices();
                     ++vertex_id_2) {
-                double q1 = cos(longitudes[vertex_id_1] - longitudes[vertex_id_2]);
-                double q2 = cos(latitudes[vertex_id_1] - latitudes[vertex_id_2]);
-                double q3 = cos(latitudes[vertex_id_1] + latitudes[vertex_id_2]);
-                Distance d = (Distance)(rrr * acos(0.5 * ((1.0 + q1) * q2 - (1.0 - q1) * q3)) + 1.0);
-                set_distance(vertex_id_1, vertex_id_2, d);
+                double q1 = cos(longitudes_[vertex_id_1] - longitudes_[vertex_id_2]);
+                double q2 = cos(latitudes_[vertex_id_1] - latitudes_[vertex_id_2]);
+                double q3 = cos(latitudes_[vertex_id_1] + latitudes_[vertex_id_2]);
+                Distance distance = (Distance)(rrr * acos(0.5 * ((1.0 + q1) * q2 - (1.0 - q1) * q3)) + 1.0);
+                set_distance(vertex_id_1, vertex_id_2, distance);
             }
         }
     } else if (edge_weight_type_ == "ATT") {
@@ -210,8 +211,8 @@ void Instance::read_tsplib(std::ifstream& file)
                 double yd = y(vertex_id_1) - y(vertex_id_2);
                 double rij = sqrt((xd * xd + yd * yd) / 10.0);
                 int tij = std::round(rij);
-                Distance d = (tij < rij)? tij + 1: tij;
-                set_distance(vertex_id_1, vertex_id_2, d);
+                Distance distance = (tij < rij)? tij + 1: tij;
+                set_distance(vertex_id_1, vertex_id_2, distance);
             }
         }
     } else if (edge_weight_type_ == "EXPLICIT") {
@@ -222,6 +223,7 @@ void Instance::read_tsplib(std::ifstream& file)
             vertex_id < number_of_vertices();
             ++vertex_id)
         distances_[vertex_id][vertex_id] = std::numeric_limits<Distance>::max();
+    */
 }
 
 std::ostream& Instance::print(

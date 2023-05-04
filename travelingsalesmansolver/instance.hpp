@@ -113,7 +113,29 @@ public:
             VertexId vertex_id_1,
             VertexId vertex_id_2) const
     {
-        return distances_[vertex_id_1][vertex_id_2];
+        if (edge_weight_type_ == "EUC_2D") {
+            double xd = x(vertex_id_2) - x(vertex_id_1);
+            double yd = y(vertex_id_2) - y(vertex_id_1);
+            return std::round(std::sqrt(xd * xd + yd * yd));
+        } else if (edge_weight_type_ == "CEIL_2D") {
+            double xd = x(vertex_id_2) - x(vertex_id_1);
+            double yd = y(vertex_id_2) - y(vertex_id_1);
+            return std::ceil(std::sqrt(xd * xd + yd * yd));
+        } else if (edge_weight_type_ == "GEO") {
+            double rrr = 6378.388;
+            double q1 = cos(longitudes_[vertex_id_1] - longitudes_[vertex_id_2]);
+            double q2 = cos(latitudes_[vertex_id_1] - latitudes_[vertex_id_2]);
+            double q3 = cos(latitudes_[vertex_id_1] + latitudes_[vertex_id_2]);
+            return (Distance)(rrr * acos(0.5 * ((1.0 + q1) * q2 - (1.0 - q1) * q3)) + 1.0);
+        } else if (edge_weight_type_ == "ATT") {
+            double xd = x(vertex_id_1) - x(vertex_id_2);
+            double yd = y(vertex_id_1) - y(vertex_id_2);
+            double rij = sqrt((xd * xd + yd * yd) / 10.0);
+            int tij = std::round(rij);
+            return (tij < rij)? tij + 1: tij;
+        } else {
+            return distances_[vertex_id_1][vertex_id_2];
+        }
     }
 
     /** Get the maximum distance between two vertices. */
@@ -176,6 +198,12 @@ private:
      * See http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp95.pdf
      */
     std::string node_coord_type_ = "TWOD_COORDS";
+
+    /** Structure for GEO edge weight type. */
+    std::vector<double> latitudes_;
+
+    /** Structure for GEO edge weight type. */
+    std::vector<double> longitudes_;
 
 };
 
