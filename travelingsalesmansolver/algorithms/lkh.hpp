@@ -22,11 +22,27 @@ struct LkhOptionalParameters
     /** SEED */
     std::string seed;
 
+    /** CANDIDATE_FILE content. */
+    std::string candidate_file_content;
+
     /** Info structure. */
     optimizationtools::Info info = optimizationtools::Info();
 };
 
-Output lkh(
+struct LkhOutput: Output
+{
+    LkhOutput(
+            const Instance& instance,
+            optimizationtools::Info& info):
+        Output(instance, info) { }
+
+    //void print_statistics(
+    //        optimizationtools::Info& info) const override;
+
+    std::string candidate_file_content;
+};
+
+LkhOutput lkh(
         const Instance& instance,
         LkhOptionalParameters parameters = {});
 

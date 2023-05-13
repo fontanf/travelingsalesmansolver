@@ -2,7 +2,7 @@
 
 using namespace travelingsalesmansolver;
 
-Output travelingsalesmansolver::lkh(
+LkhOutput travelingsalesmansolver::lkh(
         const Instance& instance,
         LkhOptionalParameters parameters)
 {
@@ -13,7 +13,7 @@ Output travelingsalesmansolver::lkh(
         << "LKH" << std::endl
         << std::endl;
 
-    Output output(instance, parameters.info);
+    LkhOutput output(instance, parameters.info);
 
     // Write instance file.
     char instance_path[L_tmpnam];
@@ -46,6 +46,19 @@ Output travelingsalesmansolver::lkh(
         parameters_file << "MAX_TRIALS = " << parameters.max_trials << std::endl;
     if (!parameters.seed.empty())
         parameters_file << "SEED = " << parameters.seed << std::endl;
+
+    // Candidate file.
+    char candidate_path[L_tmpnam];
+    tmpnam(candidate_path);
+    parameters_file << "CANDIDATE_FILE  = " << candidate_path << std::endl;
+    if (!parameters.candidate_file_content.empty()) {
+        std::ofstream candidate_file(candidate_path);
+        if (!candidate_file.good()) {
+            throw std::runtime_error(
+                    "Unable to open file \"" + std::string(candidate_path) + "\".");
+        }
+        candidate_file << parameters.candidate_file_content;
+    }
 
     // Run.
     char output_path[L_tmpnam];
@@ -81,16 +94,31 @@ Output travelingsalesmansolver::lkh(
         }
     }
 
+    // Retrieve candidate file content.
+    if (parameters.candidate_file_content.empty()) {
+        // https://stackoverflow.com/questions/2602013/read-whole-ascii-file-into-c-stdstring
+        std::ifstream candidate_file(candidate_path);
+        candidate_file.seekg(0, std::ios::end);
+        size_t size = candidate_file.tellg();
+        output.candidate_file_content = std::string(size, ' ');
+        candidate_file.seekg(0);
+        candidate_file.read(&output.candidate_file_content[0], size);
+    } else {
+        output.candidate_file_content = parameters.candidate_file_content;
+    }
+
     // Remove temporary files.
     std::remove(instance_path);
     std::remove(parameters_path);
     std::remove(solution_path);
     std::remove(output_path);
+    std::remove(candidate_path);
 
     // Update output.
     std::stringstream ss;
     ss << "final solution";
     output.update_solution(solution, ss, parameters.info);
 
-    return output.algorithm_end(parameters.info);
+    output.algorithm_end(parameters.info);
+    return output;
 }
