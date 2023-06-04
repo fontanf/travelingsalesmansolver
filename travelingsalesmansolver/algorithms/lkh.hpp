@@ -46,5 +46,29 @@ LkhOutput lkh(
         const Instance& instance,
         LkhOptionalParameters parameters = {});
 
+struct LkhCandidateEdge
+{
+    /** Other end of the edge. */
+    VertexId vertex_id;
+
+    /** Alpha value. */
+    double alpha;
+};
+
+struct LkhCandidate
+{
+    /**
+     * Parent of the vertex in the minimum spanning tree.
+     *
+     * -1 if the vertex has no parent.
+     */
+    VertexId parent_id = -1;
+
+    /** Candidate edges. */
+    std::vector<LkhCandidateEdge> edges;
+};
+
+std::vector<LkhCandidate> read_candidates(std::string candidate_file_content);
+
 }
 
