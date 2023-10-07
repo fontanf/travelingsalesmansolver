@@ -43,54 +43,7 @@ public:
      * Constructors and destructor
      */
 
-    /** Constructor to build an instance manually. */
-    Instance(VertexId number_of_vertices):
-        vertices_(number_of_vertices),
-        distances_(number_of_vertices, std::vector<Distance>(number_of_vertices, -1))
-    {
-        for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id)
-            distances_[vertex_id][vertex_id] = 0;
-    }
-
-    /** Set the distance between two vertices. */
-    inline void set_distance(
-            VertexId vertex_id_1,
-            VertexId vertex_id_2,
-            Distance distance)
-    {
-        distances_[vertex_id_1][vertex_id_2] = distance;
-        distances_[vertex_id_2][vertex_id_1] = distance;
-        distance_max_ = std::max(distance_max_, distance);
-    }
-
-    /** Set the coordinates of a vertex. */
-    void set_coordinates(
-            VertexId vertex_id,
-            double x,
-            double y,
-            double z = -1)
-    {
-        vertices_[vertex_id].x = x;
-        vertices_[vertex_id].y = y;
-        vertices_[vertex_id].z = z;
-    }
-
-    /** Set the edge weight type. */
-    void set_edge_weight_type(std::string edge_weight_type)
-    {
-        edge_weight_type_ = edge_weight_type;
-    }
-
-    /** Set the node coord type. */
-    void set_node_coord_type(std::string node_coord_type)
-    {
-        node_coord_type_ = node_coord_type;
-    }
-
-    /** Build an instance from a file. */
-    Instance(
-            std::string instance_path,
-            std::string format = "");
+    void compute_distances();
 
     /*
      * Getters
@@ -113,7 +66,13 @@ public:
             VertexId vertex_id_1,
             VertexId vertex_id_2) const
     {
-        if (edge_weight_type_ == "EUC_2D") {
+        if (!distances_.empty()) {
+            if (vertex_id_1 > vertex_id_2) {
+                return distances_[vertex_id_1][vertex_id_2];
+            } else {
+                return distances_[vertex_id_2][vertex_id_1];
+            }
+        } else if (edge_weight_type_ == "EUC_2D") {
             double xd = x(vertex_id_2) - x(vertex_id_1);
             double yd = y(vertex_id_2) - y(vertex_id_1);
             return std::round(std::sqrt(xd * xd + yd * yd));
@@ -134,7 +93,9 @@ public:
             int tij = std::round(rij);
             return (tij < rij)? tij + 1: tij;
         } else {
-            return distances_[vertex_id_1][vertex_id_2];
+            throw std::invalid_argument(
+                "Unknown edge weight type \"" + edge_weight_type_ + "\".");
+            return -1;
         }
     }
 
@@ -165,8 +126,34 @@ private:
      * Private methods
      */
 
-    /** Read an instance from a file in 'tsplib' format. */
-    void read_tsplib(std::ifstream& file);
+    /** Create an instance manually. */
+    Instance() { }
+
+    inline void init_distances()
+    {
+        distances_ = std::vector<std::vector<Distance>>(number_of_vertices());
+        for (VertexId city_id = 0;
+                city_id < number_of_vertices();
+                ++city_id) {
+            distances_[city_id] = std::vector<Distance>(
+                    city_id,
+                    std::numeric_limits<Distance>::max());
+        }
+    }
+
+    /** Set the distance between two vertices. */
+    inline void set_distance(
+            VertexId vertex_id_1,
+            VertexId vertex_id_2,
+            Distance distance)
+    {
+        if (vertex_id_1 > vertex_id_2) {
+            distances_[vertex_id_1][vertex_id_2] = distance;
+        } else {
+            distances_[vertex_id_2][vertex_id_1] = distance;
+        }
+        distance_max_ = std::max(distance_max_, distance);
+    }
 
     /*
      * Private attributes
@@ -204,6 +191,8 @@ private:
 
     /** Structure for GEO edge weight type. */
     std::vector<double> longitudes_;
+
+    friend class InstanceBuilder;
 
 };
 
