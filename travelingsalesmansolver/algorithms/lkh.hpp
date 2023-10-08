@@ -25,6 +25,9 @@ struct LkhOptionalParameters
     /** CANDIDATE_FILE content. */
     std::string candidate_file_content;
 
+    /** MAX_CANDIDATES. */
+    std::string max_candidates;
+
     /** Info structure. */
     optimizationtools::Info info = optimizationtools::Info();
 };

@@ -132,11 +132,11 @@ private:
     inline void init_distances()
     {
         distances_ = std::vector<std::vector<Distance>>(number_of_vertices());
-        for (VertexId city_id = 0;
-                city_id < number_of_vertices();
-                ++city_id) {
-            distances_[city_id] = std::vector<Distance>(
-                    city_id,
+        for (VertexId vertex_id = 0;
+                vertex_id < number_of_vertices();
+                ++vertex_id) {
+            distances_[vertex_id] = std::vector<Distance>(
+                    vertex_id,
                     std::numeric_limits<Distance>::max());
         }
     }

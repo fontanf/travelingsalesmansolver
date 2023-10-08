@@ -9,6 +9,7 @@ void Instance::compute_distances()
     if (!distances_.empty())
         return;
     init_distances();
+
     if (edge_weight_type_ == "EUC_2D") {
         for (VertexId vertex_id_1 = 0;
                 vertex_id_1 < number_of_vertices();

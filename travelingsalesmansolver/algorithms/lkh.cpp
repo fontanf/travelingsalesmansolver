@@ -46,6 +46,8 @@ LkhOutput travelingsalesmansolver::lkh(
         parameters_file << "MAX_TRIALS = " << parameters.max_trials << std::endl;
     if (!parameters.seed.empty())
         parameters_file << "SEED = " << parameters.seed << std::endl;
+    if (!parameters.max_candidates.empty())
+        parameters_file << "MAX_CANDIDATES = " << parameters.max_candidates << std::endl;
 
     // Candidate file.
     char candidate_path[L_tmpnam];

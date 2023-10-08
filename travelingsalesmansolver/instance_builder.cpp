@@ -112,7 +112,10 @@ void InstanceBuilder::read_tsplib(std::ifstream& file)
                     }
                 }
             } else {
-                std::cerr << "\033[31m" << "ERROR, EDGE_WEIGHT_FORMAT \"" << edge_weight_format << "\" not implemented." << "\033[0m" << std::endl;
+                throw std::invalid_argument(
+                        "EDGE_WEIGHT_FORMAT \""
+                        + edge_weight_format
+                        + "\" not implemented.");
             }
         } else if (tmp.rfind("NODE_COORD_SECTION", 0) == 0) {
             if (instance_.node_coord_type_ == "TWOD_COORDS") {
@@ -146,7 +149,10 @@ void InstanceBuilder::read_tsplib(std::ifstream& file)
         } else if (tmp.rfind("EOF", 0) == 0) {
             break;
         } else {
-            std::cerr << "\033[31m" << "ERROR, ENTRY \"" << line[0] << "\" not implemented." << "\033[0m" << std::endl;
+            throw std::invalid_argument(
+                    "ENTRY \""
+                    + line[0]
+                    + "\" not implemented.");
         }
     }
 }
