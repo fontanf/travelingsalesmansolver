@@ -261,7 +261,7 @@ void travelingsalesmansolver::init_display(
 {
     info.os()
         << "=====================================" << std::endl
-        << "      Traveling salesman solver      " << std::endl
+        << "       TravelingSalesmanSolver       " << std::endl
         << "=====================================" << std::endl
         << std::endl
         << "Instance" << std::endl

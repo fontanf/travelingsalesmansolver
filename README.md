@@ -1,4 +1,4 @@
-# Traveling salesman solver
+# TravelingSalesmanSolver
 
 A solver for the traveling salesman problem.
 
@@ -26,7 +26,7 @@ Examples:
 ```
 ```
 =====================================
-      Traveling salesman solver      
+       TravelingSalesmanSolver       
 =====================================
 
 Instance
