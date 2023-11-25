@@ -1,22 +1,23 @@
 #pragma once
 
-#include "travelingsalesmansolver/instance.hpp"
+#include "travelingsalesmansolver/distances.hpp"
 
 namespace travelingsalesmansolver
 {
 
-class InstanceBuilder
+class DistancesBuilder
 {
 
 public:
 
     /** Constructor. */
-    InstanceBuilder() { }
+    DistancesBuilder() { }
 
-    /** Read an instance from a file. */
-    InstanceBuilder(
-            std::string instance_path,
-            std::string format = "");
+    /** Read an distances from a file in 'tsplib' format. */
+    bool read_tsplib(
+            std::ifstream& file,
+            const std::string& tmp,
+            const std::vector<std::string>& line);
 
     /** Add vertices. */
     void add_vertices(VertexId number_of_vertices);
@@ -27,7 +28,7 @@ public:
             VertexId vertex_id_2,
             Distance distance)
     {
-        instance_.set_distance(vertex_id_1, vertex_id_2, distance);
+        distances_.set_distance(vertex_id_1, vertex_id_2, distance);
     }
 
     /** Set the coordinates of a vertex. */
@@ -37,21 +38,21 @@ public:
             double y,
             double z = -1)
     {
-        instance_.vertices_[vertex_id].x = x;
-        instance_.vertices_[vertex_id].y = y;
-        instance_.vertices_[vertex_id].z = z;
+        distances_.vertices_[vertex_id].x = x;
+        distances_.vertices_[vertex_id].y = y;
+        distances_.vertices_[vertex_id].z = z;
     }
 
     /** Set the edge weight type. */
     void set_edge_weight_type(std::string edge_weight_type)
     {
-        instance_.edge_weight_type_ = edge_weight_type;
+        distances_.edge_weight_type_ = edge_weight_type;
     }
 
     /** Set the node coord type. */
     void set_node_coord_type(std::string node_coord_type)
     {
-        instance_.node_coord_type_ = node_coord_type;
+        distances_.node_coord_type_ = node_coord_type;
     }
 
     /*
@@ -59,27 +60,16 @@ public:
      */
 
     /** Build. */
-    Instance build();
+    Distances build();
 
 private:
-
-    /*
-     * Private methods
-     */
-
-    /*
-     * Read input file
-     */
-
-    /** Read an instance from a file in 'tsplib' format. */
-    void read_tsplib(std::ifstream& file);
 
     /*
      * Private attributes
      */
 
-    /** Instance. */
-    Instance instance_;
+    /** Distances. */
+    Distances distances_;
 
 };
 

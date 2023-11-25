@@ -5,7 +5,7 @@
 namespace travelingsalesmansolver
 {
 
-Output concorde(
+const Output concorde(
         const Instance& instance,
         optimizationtools::Info info = optimizationtools::Info());
 

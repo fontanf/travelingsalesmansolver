@@ -1,4 +1,4 @@
-#include "travelingsalesmansolver/instance_builder.hpp"
+#include "travelingsalesmansolver/distances_builder.hpp"
 #include "travelingsalesmansolver/algorithms/algorithms.hpp"
 
 #include <boost/program_options.hpp>
@@ -56,8 +56,7 @@ int main(int argc, char *argv[])
 
     // Run algorithm
 
-    InstanceBuilder instance_builder(instance_path, format);
-    Instance instance = instance_builder.build();
+    const Instance instance(instance_path, format);
 
     optimizationtools::Info info = optimizationtools::Info()
         .set_verbosity_level(verbosity_level)

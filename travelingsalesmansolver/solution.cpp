@@ -39,11 +39,12 @@ void Solution::add_vertex(VertexId vertex_id)
         throw std::runtime_error("");  // TODO
     }
 
+    const Distances& distances = instance().distances();
     VertexId vertex_id_prev = vertex_ids_.back();
     vertex_ids_.push_back(vertex_id);
     vertices_is_visited_[vertex_id] = true;
-    distance_cur_ += instance().distance(vertex_id_prev, vertex_id);
-    distance_ = distance_cur_ + instance().distance(vertex_id, 0);
+    distance_cur_ += distances.distance(vertex_id_prev, vertex_id);
+    distance_ = distance_cur_ + distances.distance(vertex_id, 0);
 }
 
 std::ostream& Solution::print(

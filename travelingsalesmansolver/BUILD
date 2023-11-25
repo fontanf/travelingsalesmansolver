@@ -1,18 +1,34 @@
 load("//travelingsalesmansolver:variables.bzl", "STDCPP")
 
 cc_library(
+        name = "distances",
+        hdrs = [
+                "distances.hpp",
+                "distances_builder.hpp",
+        ],
+        srcs = [
+                "distances.cpp",
+                "distances_builder.cpp",
+        ],
+        deps = [
+                "@optimizationtools//optimizationtools/utils:utils",
+        ],
+        visibility = ["//visibility:public"],
+)
+
+
+cc_library(
         name = "travelingsalesmansolver",
         hdrs = [
                 "instance.hpp",
-                "instance_builder.hpp",
                 "solution.hpp",
         ],
         srcs = [
                 "instance.cpp",
-                "instance_builder.cpp",
                 "solution.cpp",
         ],
         deps = [
+                ":distances",
                 "@optimizationtools//optimizationtools/utils:info",
                 "@optimizationtools//optimizationtools/utils:utils",
                 "@optimizationtools//optimizationtools/containers:containers",

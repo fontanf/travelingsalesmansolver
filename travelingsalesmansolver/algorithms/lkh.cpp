@@ -2,7 +2,7 @@
 
 using namespace travelingsalesmansolver;
 
-LkhOutput travelingsalesmansolver::lkh(
+const LkhOutput travelingsalesmansolver::lkh(
         const Instance& instance,
         LkhOptionalParameters parameters)
 {

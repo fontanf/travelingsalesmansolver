@@ -45,7 +45,7 @@ struct LkhOutput: Output
     std::string candidate_file_content;
 };
 
-LkhOutput lkh(
+const LkhOutput lkh(
         const Instance& instance,
         LkhOptionalParameters parameters = {});
 

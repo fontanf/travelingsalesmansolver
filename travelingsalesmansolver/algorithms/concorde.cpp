@@ -2,7 +2,7 @@
 
 using namespace travelingsalesmansolver;
 
-Output travelingsalesmansolver::concorde(
+const Output travelingsalesmansolver::concorde(
         const Instance& instance,
         optimizationtools::Info info)
 {

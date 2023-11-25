@@ -12,7 +12,7 @@ def Settings(**kwargs):
                 'googletest/googletest/include/',
 
                 '-I', './bazel-travelingsalesmansolver/external/'
-                'boost/',
+                'boost/boost/',
 
                 # optimizationtools
                 '-I', './bazel-travelingsalesmansolver/external/'
