@@ -13,16 +13,3 @@ cc_library(
         deps = ["//travelingsalesmansolver:travelingsalesmansolver"],
         visibility = ["//visibility:public"],
 )
-
-cc_library(
-        name = "algorithms",
-        hdrs = ["algorithms.hpp"],
-        srcs = ["algorithms.cpp"],
-        deps = [
-                ":concorde",
-                ":lkh",
-                "@boost//:program_options",
-        ],
-        visibility = ["//visibility:public"],
-)
-

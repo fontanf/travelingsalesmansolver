@@ -2,6 +2,12 @@
 
 #include "travelingsalesmansolver/instance.hpp"
 
+#include "optimizationtools/utils/output.hpp"
+#include "optimizationtools/utils/utils.hpp"
+
+#include "nlohmann/json.hpp"
+
+#include <iomanip>
 #include <string>
 
 namespace travelingsalesmansolver
@@ -16,7 +22,7 @@ class Solution
 public:
 
     /*
-     * Constructors and destructor.
+     * Constructors and destructor
      */
 
     /** Create an empty solution. */
@@ -25,7 +31,7 @@ public:
     /** Create a solution from a certificate file. */
     Solution(
             const Instance& instance,
-            std::string certificate_path);
+            const std::string& certificate_path);
 
     /*
      * Getters
@@ -43,6 +49,9 @@ public:
     /** Get the full distance of the solution. */
     inline Distance distance() const { return distance_; }
 
+    /** Get the total cost of the solution. */
+    inline Distance objective_value() const { return distance(); }
+
     /**
      * Return 'true' iff the solution is feasible.
      * - all vertices have been visited
@@ -57,21 +66,25 @@ public:
     void add_vertex(VertexId vertex_id);
 
     /*
-     * Export.
+     * Export
      */
 
-    /** Print the instance. */
-    std::ostream& print(
-            std::ostream& os,
-            int verbose = 1) const;
-
     /** Write the solution to a file. */
-    void write(std::string certificate_path) const;
+    void write(
+            const std::string& certificate_path) const;
+
+    /** Export solution characteristics to a JSON structure. */
+    nlohmann::json to_json() const;
+
+    /** Write a formatted output of the instance to a stream. */
+    void format(
+            std::ostream& os,
+            int verbosity_level = 1) const;
 
 private:
 
     /*
-     * Private attributes.
+     * Private attributes
      */
 
     /** Instance. */
@@ -106,15 +119,19 @@ private:
 //////////////////////////////////// Output ////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+inline optimizationtools::ObjectiveDirection objective_direction()
+{
+    return optimizationtools::ObjectiveDirection::Minimize;
+}
+
 /**
  * Output structure for a 'travelingsalesman' problem.
  */
-struct Output
+struct Output: optimizationtools::Output
 {
     /** Constructor. */
-    Output(
-            const Instance& instance,
-            optimizationtools::Info& info);
+    Output(const Instance& instance): solution(instance) { }
+
 
     /** Solution. */
     Solution solution;
@@ -125,32 +142,82 @@ struct Output
     /** Elapsed time. */
     double time = -1;
 
-    /** Return 'true' iff the solution is optimal. */
-    bool optimal() const { return solution.feasible() && solution.distance() == bound; }
 
-    /** Print current state. */
-    void print(
-            optimizationtools::Info& info,
-            const std::stringstream& s) const;
+    std::string solution_value() const
+    {
+        return optimizationtools::solution_value(
+            objective_direction(),
+            solution.feasible(),
+            solution.objective_value());
+    }
 
-    /** Update the solution. */
-    void update_solution(
-            const Solution& solution_new,
-            const std::stringstream& s,
-            optimizationtools::Info& info);
+    double absolute_optimality_gap() const
+    {
+        return optimizationtools::absolute_optimality_gap(
+                objective_direction(),
+                solution.feasible(),
+                solution.objective_value(),
+                bound);
+    }
 
-    /** Update the bound. */
-    void update_bound(
-            Distance bound_new,
-            const std::stringstream& s,
-            optimizationtools::Info& info);
+    double relative_optimality_gap() const
+    {
+       return optimizationtools::relative_optimality_gap(
+            objective_direction(),
+            solution.feasible(),
+            solution.objective_value(),
+            bound);
+    }
 
-    /** Print the algorithm statistics. */
-    virtual void print_statistics(
-            optimizationtools::Info& info) const { (void)info; }
+    virtual nlohmann::json to_json() const
+    {
+        return nlohmann::json {
+            {"Solution", solution.to_json()},
+            {"Value", solution_value()},
+            {"Bound", bound},
+            {"AbsoluteOptimalityGap", absolute_optimality_gap()},
+            {"RelativeOptimalityGap", relative_optimality_gap()},
+            {"Time", time}
+        };
+    }
 
-    /** Method to call at the end of the algorithm. */
-    Output& algorithm_end(optimizationtools::Info& info);
+    virtual int format_width() const { return 30; }
+
+    virtual void format(std::ostream& os) const
+    {
+        int width = format_width();
+        os
+            << std::setw(width) << std::left << "Value: " << solution_value() << std::endl
+            << std::setw(width) << std::left << "Bound: " << bound << std::endl
+            << std::setw(width) << std::left << "Absolute optimality gap: " << absolute_optimality_gap() << std::endl
+            << std::setw(width) << std::left << "Relative optimality gap (%): " << relative_optimality_gap() * 100 << std::endl
+            << std::setw(width) << std::left << "Time (s): " << time << std::endl
+            ;
+    }
+};
+
+using NewSolutionCallback = std::function<void(const Output&, const std::string&)>;
+
+struct Parameters: optimizationtools::Parameters
+{
+    /** Callback function called when a new best solution is found. */
+    NewSolutionCallback new_solution_callback = [](const Output&, const std::string&) { };
+
+
+    virtual nlohmann::json to_json() const override
+    {
+        nlohmann::json json = optimizationtools::Parameters::to_json();
+        json.merge_patch({});
+        return json;
+    }
+
+    virtual int format_width() const override { return 23; }
+
+    virtual void format(std::ostream& os) const override
+    {
+        optimizationtools::Parameters::format(os);
+        //int width = format_width();
+    }
 };
 
 }

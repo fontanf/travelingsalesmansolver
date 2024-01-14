@@ -2,7 +2,6 @@
 
 #include <fstream>
 #include <iostream>
-#include <iomanip>
 #include <vector>
 #include <limits>
 #include <cmath>
@@ -101,18 +100,12 @@ public:
      */
 
     /** Print the instance. */
-    std::ostream& print(
+    std::ostream& format(
             std::ostream& os,
             int verbose = 1) const;
 
     /** Write the instance to a file. */
     void write(std::ofstream& file) const;
-
-    /** Check a certificate. */
-    std::pair<bool, Distance> check(
-            std::string certificate_path,
-            std::ostream& os,
-            int verbose = 1) const;
 
 private:
 

@@ -2,10 +2,12 @@
 
 #include "travelingsalesmansolver/solution.hpp"
 
+#include <iomanip>
+
 namespace travelingsalesmansolver
 {
 
-struct LkhOptionalParameters
+struct LkhParameters: Parameters
 {
     /** CANDIDATE_SET_TYPE */
     std::string candidate_set_type;
@@ -28,26 +30,49 @@ struct LkhOptionalParameters
     /** MAX_CANDIDATES. */
     std::string max_candidates;
 
-    /** Info structure. */
-    optimizationtools::Info info = optimizationtools::Info();
+
+    virtual int format_width() const override { return 37; }
+
+    virtual void format(std::ostream& os) const override
+    {
+        Parameters::format(os);
+        int width = format_width();
+        os
+            << std::setw(width) << std::left << "Candidate set type: " << candidate_set_type << std::endl
+            << std::setw(width) << std::left << "Initial period:  " << initial_period << std::endl
+            << std::setw(width) << std::left << "Runs:  " << runs << std::endl
+            << std::setw(width) << std::left << "Seed:  " << seed << std::endl
+            << std::setw(width) << std::left << "Has candidate flle content:  " << (!candidate_file_content.empty()) << std::endl
+            << std::setw(width) << std::left << "Max candidates:  " << max_candidates << std::endl
+            ;
+    }
+
+    virtual nlohmann::json to_json() const override
+    {
+        nlohmann::json json = Parameters::to_json();
+        json.merge_patch({
+                {"CandidateSetType", candidate_set_type},
+                {"InitialPeriod", initial_period},
+                {"seed", seed},
+                {"HasCandidateFileContent", (!candidate_file_content.empty())},
+                {"MaxCandidates", max_candidates},
+                });
+        return json;
+    }
 };
 
 struct LkhOutput: Output
 {
-    LkhOutput(
-            const Instance& instance,
-            optimizationtools::Info& info):
-        Output(instance, info) { }
+    LkhOutput(const Instance& instance):
+        Output(instance) { }
 
-    //void print_statistics(
-    //        optimizationtools::Info& info) const override;
 
     std::string candidate_file_content;
 };
 
 const LkhOutput lkh(
         const Instance& instance,
-        LkhOptionalParameters parameters = {});
+        const LkhParameters& parameters = {});
 
 struct LkhCandidateEdge
 {

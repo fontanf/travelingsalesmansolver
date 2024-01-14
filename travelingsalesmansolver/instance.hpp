@@ -2,13 +2,7 @@
 
 #include "travelingsalesmansolver/distances.hpp"
 
-#include "optimizationtools/containers/indexed_set.hpp"
-#include "optimizationtools/utils/utils.hpp"
-#include "optimizationtools/utils/info.hpp"
-
-#include <fstream>
-#include <iostream>
-#include <iomanip>
+#include <memory>
 
 namespace travelingsalesmansolver
 {
@@ -17,6 +11,7 @@ using VertexId = int64_t;
 using VertexPos = int64_t;
 using Distance = int64_t;
 using Counter = int64_t;
+using Seed = int64_t;
 
 /**
  * Instance class for a 'travelingsalesman' problem.
@@ -31,11 +26,13 @@ public:
      */
 
     /** Build an instance from a distances object. */
-    Instance(const std::shared_ptr<const Distances>& distances): distances_(distances) { }
+    Instance(
+            const std::shared_ptr<const Distances>& distances):
+        distances_(distances) { }
 
     Instance(
-            std::string instance_path,
-            std::string format = "");
+            const std::string& instance_path,
+            const std::string& format = "");
 
     /*
      * Getters
@@ -52,18 +49,19 @@ public:
      */
 
     /** Print the instance. */
-    std::ostream& print(
+    std::ostream& format(
             std::ostream& os,
-            int verbose = 1) const;
+            int verbosity_level = 1) const;
 
     /** Write the instance to a file. */
-    void write(std::string instance_path) const;
+    void write(
+            const std::string& instance_path) const;
 
     /** Check a certificate. */
     std::pair<bool, Distance> check(
-            std::string certificate_path,
+            const std::string& certificate_path,
             std::ostream& os,
-            int verbose = 1) const;
+            int verbosity_level = 1) const;
 
 private:
 
@@ -92,9 +90,4 @@ private:
 
 };
 
-void init_display(
-        const Instance& instance,
-        optimizationtools::Info& info);
-
 }
-

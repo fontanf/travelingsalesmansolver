@@ -1,19 +1,17 @@
 #include "travelingsalesmansolver/algorithms/concorde.hpp"
 
+#include "travelingsalesmansolver/algorithm_formatter.hpp"
+
 using namespace travelingsalesmansolver;
 
 const Output travelingsalesmansolver::concorde(
         const Instance& instance,
-        optimizationtools::Info info)
+        const Parameters& parameters)
 {
-    init_display(instance, info);
-    info.os()
-        << "Algorithm" << std::endl
-        << "---------" << std::endl
-        << "Concorde" << std::endl
-        << std::endl;
-
-    Output output(instance, info);
+    Output output(instance);
+    AlgorithmFormatter algorithm_formatter(parameters, output);
+    algorithm_formatter.start("Concorde");
+    algorithm_formatter.print_header();
 
     // Write instance file.
     char instance_path[L_tmpnam];
@@ -58,10 +56,9 @@ const Output travelingsalesmansolver::concorde(
     std::remove(output_path);
 
     // Update output.
-    std::stringstream ss;
-    ss << "final solution";
-    output.update_solution(solution, ss, info);
-    output.update_bound(solution.distance(), ss, info);
+    algorithm_formatter.update_solution(solution, "final solution");
+    algorithm_formatter.update_bound(solution.distance(), "final solution");
 
-    return output.algorithm_end(info);
+    algorithm_formatter.end();
+    return output;
 }

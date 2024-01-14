@@ -3,12 +3,15 @@
 #include "travelingsalesmansolver/distances_builder.hpp"
 
 #include "optimizationtools/utils/utils.hpp"
+#include "optimizationtools/containers//indexed_set.hpp"
+
+#include <iomanip>
 
 using namespace travelingsalesmansolver;
 
 Instance::Instance(
-        std::string instance_path,
-        std::string format)
+        const std::string& instance_path,
+        const std::string& format)
 {
     std::ifstream file(instance_path);
     if (!file.good()) {
@@ -56,15 +59,15 @@ void Instance::read_tsplib(std::ifstream& file)
             new travelingsalesmansolver::Distances(distances_builder.build()));
 }
 
-std::ostream& Instance::print(
+std::ostream& Instance::format(
         std::ostream& os,
-        int verbose) const
+        int verbosity_level) const
 {
-    if (verbose >= 1) {
+    if (verbosity_level >= 1) {
         os << "Number of vertices:  " << number_of_vertices() << std::endl;
     }
 
-    if (verbose >= 2) {
+    if (verbosity_level >= 2) {
         os << std::endl
             << std::setw(12) << "Loc. 1"
             << std::setw(12) << "Loc. 2"
@@ -92,7 +95,8 @@ std::ostream& Instance::print(
     return os;
 }
 
-void Instance::write(std::string instance_path) const
+void Instance::write(
+        const std::string& instance_path) const
 {
     if (instance_path.empty())
         return;
@@ -111,9 +115,9 @@ void Instance::write(std::string instance_path) const
 }
 
 std::pair<bool, Distance> Instance::check(
-        std::string certificate_path,
+        const std::string& certificate_path,
         std::ostream& os,
-        int verbose) const
+        int verbosity_level) const
 {
     std::ifstream file(certificate_path);
     if (!file.good()) {
@@ -121,7 +125,7 @@ std::pair<bool, Distance> Instance::check(
                 "Unable to open file \"" + certificate_path + "\".");
     }
 
-    if (verbose >= 2) {
+    if (verbosity_level >= 2) {
         os << std::endl
             << std::setw(12) << "Vertex"
             << std::setw(12) << "Distance"
@@ -142,7 +146,7 @@ std::pair<bool, Distance> Instance::check(
         // Check duplicates.
         if (vertices.contains(vertex_id)) {
             number_of_duplicates++;
-            if (verbose >= 2) {
+            if (verbosity_level >= 2) {
                 os << "Vertex " << vertex_id
                     << " has already been visited." << std::endl;
             }
@@ -151,7 +155,7 @@ std::pair<bool, Distance> Instance::check(
 
         total_distance += distances().distance(vertex_id_pred, vertex_id);
 
-        if (verbose >= 2) {
+        if (verbosity_level >= 2) {
             os
                 << std::setw(12) << vertex_id
                 << std::setw(12) << total_distance
@@ -166,9 +170,9 @@ std::pair<bool, Distance> Instance::check(
         = (vertices.size() == number_of_vertices())
         && (number_of_duplicates == 0);
 
-    if (verbose >= 2)
+    if (verbosity_level >= 2)
         os << std::endl;
-    if (verbose >= 1) {
+    if (verbosity_level >= 1) {
         os
             << "Number of vertices:     " << vertices.size() << " / " << number_of_vertices()  << std::endl
             << "Number of duplicates:   " << number_of_duplicates << std::endl
@@ -177,19 +181,4 @@ std::pair<bool, Distance> Instance::check(
             ;
     }
     return {feasible, total_distance};
-}
-
-void travelingsalesmansolver::init_display(
-        const Instance& instance,
-        optimizationtools::Info& info)
-{
-    info.os()
-        << "=====================================" << std::endl
-        << "       TravelingSalesmanSolver       " << std::endl
-        << "=====================================" << std::endl
-        << std::endl
-        << "Instance" << std::endl
-        << "--------" << std::endl;
-    instance.print(info.os(), info.verbosity_level());
-    info.os() << std::endl;
 }

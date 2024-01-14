@@ -1,6 +1,6 @@
 #include "travelingsalesmansolver/distances.hpp"
 
-#include "optimizationtools/utils/utils.hpp"
+#include <iomanip>
 
 using namespace travelingsalesmansolver;
 
@@ -92,7 +92,7 @@ void Distances::compute_distances() const
     }
 }
 
-std::ostream& Distances::print(
+std::ostream& Distances::format(
         std::ostream& os,
         int verbose) const
 {

@@ -7,7 +7,7 @@ namespace travelingsalesmansolver
 
 const Output concorde(
         const Instance& instance,
-        optimizationtools::Info info = optimizationtools::Info());
+        const Parameters& parameters = {});
 
 }
 

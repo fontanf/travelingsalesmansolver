@@ -22,14 +22,15 @@ cc_library(
         hdrs = [
                 "instance.hpp",
                 "solution.hpp",
+                "algorithm_formatter.hpp",
         ],
         srcs = [
                 "instance.cpp",
                 "solution.cpp",
+                "algorithm_formatter.cpp",
         ],
         deps = [
                 ":distances",
-                "@optimizationtools//optimizationtools/utils:info",
                 "@optimizationtools//optimizationtools/utils:utils",
                 "@optimizationtools//optimizationtools/containers:containers",
         ],
@@ -40,7 +41,9 @@ cc_binary(
         name = "main",
         srcs = ["main.cpp"],
         deps = [
-                "//travelingsalesmansolver/algorithms:algorithms",
+                "//travelingsalesmansolver/algorithms:lkh",
+                "//travelingsalesmansolver/algorithms:concorde",
+                "@boost//:program_options",
         ],
         linkopts = select({
                     "@bazel_tools//src/conditions:windows": [],

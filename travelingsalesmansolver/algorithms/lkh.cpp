@@ -1,19 +1,17 @@
 #include "travelingsalesmansolver/algorithms/lkh.hpp"
 
+#include "travelingsalesmansolver/algorithm_formatter.hpp"
+
 using namespace travelingsalesmansolver;
 
 const LkhOutput travelingsalesmansolver::lkh(
         const Instance& instance,
-        LkhOptionalParameters parameters)
+        const LkhParameters& parameters)
 {
-    init_display(instance, parameters.info);
-    parameters.info.os()
-        << "Algorithm" << std::endl
-        << "---------" << std::endl
-        << "LKH" << std::endl
-        << std::endl;
-
-    LkhOutput output(instance, parameters.info);
+    LkhOutput output(instance);
+    AlgorithmFormatter algorithm_formatter(parameters, output);
+    algorithm_formatter.start("LKH");
+    algorithm_formatter.print_header();
 
     // Write instance file.
     char instance_path[L_tmpnam];
@@ -34,8 +32,8 @@ const LkhOutput travelingsalesmansolver::lkh(
     char solution_path[L_tmpnam];
     tmpnam(solution_path);
     parameters_file << "OUTPUT_TOUR_FILE = " << solution_path << std::endl;
-    if (parameters.info.time_limit != std::numeric_limits<double>::infinity())
-        parameters_file << "TIME_LIMIT = " << parameters.info.remaining_time() << std::endl;
+    if (parameters.timer.time_limit() != std::numeric_limits<double>::infinity())
+        parameters_file << "TIME_LIMIT = " << parameters.timer.remaining_time() << std::endl;
     if (!parameters.candidate_set_type.empty())
         parameters_file << "CANDIDATE_SET_TYPE = " << parameters.candidate_set_type << std::endl;
     if (!parameters.initial_period.empty())
@@ -117,11 +115,9 @@ const LkhOutput travelingsalesmansolver::lkh(
     std::remove(candidate_path);
 
     // Update output.
-    std::stringstream ss;
-    ss << "final solution";
-    output.update_solution(solution, ss, parameters.info);
+    algorithm_formatter.update_solution(solution, "Final solution");
 
-    output.algorithm_end(parameters.info);
+    algorithm_formatter.end();
     return output;
 }
 
