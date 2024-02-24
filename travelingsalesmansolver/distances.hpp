@@ -123,7 +123,7 @@ private:
                 vertex_id < number_of_vertices();
                 ++vertex_id) {
             distances_[vertex_id] = std::vector<Distance>(
-                    vertex_id,
+                    vertex_id + 1,
                     std::numeric_limits<Distance>::max());
         }
     }
