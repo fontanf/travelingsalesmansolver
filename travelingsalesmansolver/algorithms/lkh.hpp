@@ -96,7 +96,8 @@ struct LkhCandidate
     std::vector<LkhCandidateEdge> edges;
 };
 
-std::vector<LkhCandidate> read_candidates(std::string candidate_file_content);
+std::vector<LkhCandidate> read_candidates(
+        const std::string& candidate_file_content);
 
 }
 

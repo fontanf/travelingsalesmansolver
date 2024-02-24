@@ -44,13 +44,15 @@ public:
     }
 
     /** Set the edge weight type. */
-    void set_edge_weight_type(std::string edge_weight_type)
+    void set_edge_weight_type(
+            const std::string& edge_weight_type)
     {
         distances_.edge_weight_type_ = edge_weight_type;
     }
 
     /** Set the node coord type. */
-    void set_node_coord_type(std::string node_coord_type)
+    void set_node_coord_type(
+            const std::string& node_coord_type)
     {
         distances_.node_coord_type_ = node_coord_type;
     }

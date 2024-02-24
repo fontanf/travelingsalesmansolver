@@ -122,7 +122,7 @@ const LkhOutput travelingsalesmansolver::lkh(
 }
 
 std::vector<LkhCandidate> travelingsalesmansolver::read_candidates(
-        std::string candidate_file_content)
+        const std::string& candidate_file_content)
 {
     std::stringstream ss(candidate_file_content);
     VertexId number_of_vertices = -1;
