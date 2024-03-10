@@ -7,8 +7,6 @@ bool DistancesBuilder::read_tsplib(
         const std::string& tmp,
         const std::vector<std::string>& line)
 {
-    std::unique_ptr<DistancesExplicitBuilder> distances_explicit_builder = nullptr;
-
     if (tmp.rfind("EDGE_WEIGHT_TYPE", 0) == 0) {
         edge_weight_type_ = line.back();
 

@@ -42,7 +42,15 @@ public:
 
     void compute_distances_explicit() const;
 
+    template <typename T>
+    void compute_distances_explicit(
+            const T& distances) const;
+
     void compute_distances_explicit_triangle() const;
+
+    template <typename T>
+    void compute_distances_explicit_triangle(
+            const T& distances) const;
 
     /*
      * Getters
@@ -103,9 +111,9 @@ private:
 
     VertexId number_of_vertices_;
 
-    std::unique_ptr<const DistancesExplicit> distances_explicit_ = nullptr;
+    mutable std::unique_ptr<const DistancesExplicit> distances_explicit_ = nullptr;
 
-    std::unique_ptr<const DistancesExplicitTriangle> distances_explicit_triangle_ = nullptr;
+    mutable std::unique_ptr<const DistancesExplicitTriangle> distances_explicit_triangle_ = nullptr;
 
     std::unique_ptr<const DistancesEuc2D> distances_euc_2d_ = nullptr;
 
@@ -125,6 +133,48 @@ void Distances::write(
         std::ofstream& file) const
 {
     distances.write(file);
+}
+
+template <typename T>
+void Distances::compute_distances_explicit(
+        const T& distances) const
+{
+    DistancesExplicitBuilder distances_explicit_builder;
+    distances_explicit_builder.set_number_of_vertices(number_of_vertices());
+    for (VertexId vertex_id_1 = 1;
+            vertex_id_1 < number_of_vertices();
+            ++vertex_id_1) {
+        for (VertexId vertex_id_2 = 0;
+                vertex_id_2 < number_of_vertices();
+                ++vertex_id_2) {
+            distances_explicit_builder.set_distance(
+                    vertex_id_1,
+                    vertex_id_2,
+                    distances.distance(vertex_id_1, vertex_id_2));
+        }
+    }
+    distances_explicit_ = std::make_unique<const DistancesExplicit>(distances_explicit_builder.build());
+}
+
+template <typename T>
+void Distances::compute_distances_explicit_triangle(
+        const T& distances) const
+{
+    DistancesExplicitTriangleBuilder distances_explicit_triangle_builder;
+    distances_explicit_triangle_builder.set_number_of_vertices(number_of_vertices());
+    for (VertexId vertex_id_1 = 1;
+            vertex_id_1 < number_of_vertices();
+            ++vertex_id_1) {
+        for (VertexId vertex_id_2 = 0;
+                vertex_id_2 < vertex_id_1;
+                ++vertex_id_2) {
+            distances_explicit_triangle_builder.set_distance(
+                    vertex_id_1,
+                    vertex_id_2,
+                    distances.distance(vertex_id_1, vertex_id_2));
+        }
+    }
+    distances_explicit_triangle_ = std::make_unique<const DistancesExplicitTriangle>(distances_explicit_triangle_builder.build());
 }
 
 template <typename T>

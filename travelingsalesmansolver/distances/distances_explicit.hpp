@@ -80,7 +80,6 @@ public:
             Distance distance)
     {
         distances_.distances_[vertex_id_1][vertex_id_2] = distance;
-        distances_.distances_[vertex_id_2][vertex_id_1] = distance;
     }
 
     /** Build. */
