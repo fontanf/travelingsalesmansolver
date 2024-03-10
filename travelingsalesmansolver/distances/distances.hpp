@@ -141,7 +141,7 @@ void Distances::compute_distances_explicit(
 {
     DistancesExplicitBuilder distances_explicit_builder;
     distances_explicit_builder.set_number_of_vertices(number_of_vertices());
-    for (VertexId vertex_id_1 = 1;
+    for (VertexId vertex_id_1 = 0;
             vertex_id_1 < number_of_vertices();
             ++vertex_id_1) {
         for (VertexId vertex_id_2 = 0;
@@ -162,7 +162,7 @@ void Distances::compute_distances_explicit_triangle(
 {
     DistancesExplicitTriangleBuilder distances_explicit_triangle_builder;
     distances_explicit_triangle_builder.set_number_of_vertices(number_of_vertices());
-    for (VertexId vertex_id_1 = 1;
+    for (VertexId vertex_id_1 = 0;
             vertex_id_1 < number_of_vertices();
             ++vertex_id_1) {
         for (VertexId vertex_id_2 = 0;

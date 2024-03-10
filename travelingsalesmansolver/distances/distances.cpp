@@ -1,29 +1,15 @@
 #include "travelingsalesmansolver/distances/distances.hpp"
 
-#include <iomanip>
-
 using namespace travelingsalesmansolver;
 
 void Distances::compute_distances_explicit() const
 {
-    //if (!distances_.empty())
-    //    return;
-    //init_distances(triangle);
+    FUNCTION_WITH_DISTANCES(this->compute_distances_explicit, *this);
+}
 
-    //    for (VertexId vertex_id_1 = 0;
-    //            vertex_id_1 < number_of_vertices();
-    //            ++vertex_id_1) {
-    //        for (VertexId vertex_id_2 = 0;
-    //                vertex_id_2 < vertex_id_1;
-    //                ++vertex_id_2) {
-    //            distances_[vertex_id_1][vertex_id_2] = compute_distance(vertex_id_1, vertex_id_2);
-    //        }
-    //    }
-    //for (VertexId vertex_id = 0;
-    //        vertex_id < number_of_vertices();
-    //        ++vertex_id) {
-    //    distances_[vertex_id][vertex_id] = std::numeric_limits<Distance>::max();
-    //}
+void Distances::compute_distances_explicit_triangle() const
+{
+    FUNCTION_WITH_DISTANCES(this->compute_distances_explicit_triangle, *this);
 }
 
 std::ostream& Distances::format(
