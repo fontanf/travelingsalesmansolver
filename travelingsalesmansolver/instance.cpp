@@ -1,11 +1,9 @@
 #include "travelingsalesmansolver/instance.hpp"
 
-#include "travelingsalesmansolver/distances_builder.hpp"
+#include "travelingsalesmansolver/distances/distances_builder.hpp"
 
 #include "optimizationtools/utils/utils.hpp"
 #include "optimizationtools/containers//indexed_set.hpp"
-
-#include <iomanip>
 
 using namespace travelingsalesmansolver;
 
@@ -44,7 +42,7 @@ void Instance::read_tsplib(std::ifstream& file)
         } else if (tmp.rfind("TYPE", 0) == 0) {
         } else if (tmp.rfind("DIMENSION", 0) == 0) {
             VertexId number_of_vertices = std::stol(line.back());
-            distances_builder.add_vertices(number_of_vertices);
+            distances_builder.set_number_of_vertices(number_of_vertices);
         } else if (tmp.rfind("EOF", 0) == 0) {
             break;
         } else {
@@ -63,36 +61,11 @@ std::ostream& Instance::format(
         std::ostream& os,
         int verbosity_level) const
 {
-    if (verbosity_level >= 1) {
-        os << "Number of vertices:  " << number_of_vertices() << std::endl;
-    }
-
-    if (verbosity_level >= 2) {
-        os << std::endl
-            << std::setw(12) << "Loc. 1"
-            << std::setw(12) << "Loc. 2"
-            << std::setw(12) << "Distance"
-            << std::endl
-            << std::setw(12) << "------"
-            << std::setw(12) << "------"
-            << std::setw(12) << "--------"
-            << std::endl;
-        for (VertexId vertex_id_1 = 0;
-                vertex_id_1 < number_of_vertices();
-                ++vertex_id_1) {
-            for (VertexId vertex_id_2 = vertex_id_1 + 1;
-                    vertex_id_2 < number_of_vertices();
-                    ++vertex_id_2) {
-                os
-                    << std::setw(12) << vertex_id_1
-                    << std::setw(12) << vertex_id_2
-                    << std::setw(12) << distances().distance(vertex_id_1, vertex_id_2)
-                    << std::endl;
-            }
-        }
-    }
-
-    return os;
+    return FUNCTION_WITH_DISTANCES(
+            (this->Instance::format),
+            *distances_,
+            os,
+            verbosity_level);
 }
 
 void Instance::write(
@@ -114,7 +87,23 @@ void Instance::write(
     file << "EOF" << std::endl;
 }
 
+
 std::pair<bool, Distance> Instance::check(
+        const std::string& certificate_path,
+        std::ostream& os,
+        int verbosity_level) const
+{
+    return FUNCTION_WITH_DISTANCES(
+            (this->Instance::check),
+            *distances_,
+            certificate_path,
+            os,
+            verbosity_level);
+}
+
+template <typename Distances>
+std::pair<bool, Distance> Instance::check(
+        const Distances& distances,
         const std::string& certificate_path,
         std::ostream& os,
         int verbosity_level) const
@@ -153,7 +142,7 @@ std::pair<bool, Distance> Instance::check(
         }
         vertices.add(vertex_id);
 
-        total_distance += distances().distance(vertex_id_pred, vertex_id);
+        total_distance += distances.distance(vertex_id_pred, vertex_id);
 
         if (verbosity_level >= 2) {
             os
@@ -164,7 +153,7 @@ std::pair<bool, Distance> Instance::check(
 
         vertex_id_pred = vertex_id;
     }
-    total_distance += distances().distance(vertex_id_pred, 0);
+    total_distance += distances.distance(vertex_id_pred, 0);
 
     bool feasible
         = (vertices.size() == number_of_vertices())

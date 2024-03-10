@@ -32,21 +32,6 @@ bool Solution::feasible() const
     return (number_of_vertices() == instance().number_of_vertices());
 }
 
-void Solution::add_vertex(VertexId vertex_id)
-{
-    // Check that the vertex has not already been visited.
-    if (vertices_is_visited_[vertex_id]) {
-        throw std::runtime_error("");  // TODO
-    }
-
-    const Distances& distances = instance().distances();
-    VertexId vertex_id_prev = vertex_ids_.back();
-    vertex_ids_.push_back(vertex_id);
-    vertices_is_visited_[vertex_id] = true;
-    distance_cur_ += distances.distance(vertex_id_prev, vertex_id);
-    distance_ = distance_cur_ + distances.distance(vertex_id, 0);
-}
-
 void Solution::format(
         std::ostream& os,
         int verbosity_level) const

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "travelingsalesmansolver/distances.hpp"
+#include "travelingsalesmansolver/distances/distances.hpp"
 
-#include <memory>
+#include <iomanip>
 
 namespace travelingsalesmansolver
 {
@@ -39,7 +39,7 @@ public:
      */
 
     /** Get the number of vertices. */
-    inline VertexId number_of_vertices() const { return distances().number_of_vertices(); }
+    inline VertexId number_of_vertices() const { return distances_->number_of_vertices(); }
 
     /** Get distances. */
     const Distances& distances() const { return *distances_; }
@@ -53,12 +53,27 @@ public:
             std::ostream& os,
             int verbosity_level = 1) const;
 
+    /** Print the instance. */
+    template <typename Distances>
+    std::ostream& format(
+            const Distances& distances,
+            std::ostream& os,
+            int verbosity_level = 1) const;
+
     /** Write the instance to a file. */
     void write(
             const std::string& instance_path) const;
 
     /** Check a certificate. */
     std::pair<bool, Distance> check(
+            const std::string& certificate_path,
+            std::ostream& os,
+            int verbosity_level = 1) const;
+
+    /** Check a certificate. */
+    template <typename Distances>
+    std::pair<bool, Distance> check(
+            const Distances& distances,
             const std::string& certificate_path,
             std::ostream& os,
             int verbosity_level = 1) const;
@@ -89,5 +104,43 @@ private:
     friend class InstanceBuilder;
 
 };
+
+template <typename Distances>
+std::ostream& Instance::format(
+        const Distances& distances,
+        std::ostream& os,
+        int verbosity_level) const
+{
+    if (verbosity_level >= 1) {
+        os << "Number of vertices:  " << number_of_vertices() << std::endl;
+    }
+
+    if (verbosity_level >= 2) {
+        os << std::endl
+            << std::setw(12) << "Loc. 1"
+            << std::setw(12) << "Loc. 2"
+            << std::setw(12) << "Distance"
+            << std::endl
+            << std::setw(12) << "------"
+            << std::setw(12) << "------"
+            << std::setw(12) << "--------"
+            << std::endl;
+        for (VertexId vertex_id_1 = 0;
+                vertex_id_1 < number_of_vertices();
+                ++vertex_id_1) {
+            for (VertexId vertex_id_2 = vertex_id_1 + 1;
+                    vertex_id_2 < number_of_vertices();
+                    ++vertex_id_2) {
+                os
+                    << std::setw(12) << vertex_id_1
+                    << std::setw(12) << vertex_id_2
+                    << std::setw(12) << distances.distance(vertex_id_1, vertex_id_2)
+                    << std::endl;
+            }
+        }
+    }
+
+    return os;
+}
 
 }

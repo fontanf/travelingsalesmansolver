@@ -63,7 +63,10 @@ public:
      */
 
     /** Append a vertex at the end of the solution. */
-    void add_vertex(VertexId vertex_id);
+    template <typename Distances>
+    void add_vertex(
+            const Distances& distances,
+            VertexId vertex_id);
 
     /*
      * Export
@@ -220,5 +223,21 @@ struct Parameters: optimizationtools::Parameters
     }
 };
 
+template <typename Distances>
+void Solution::add_vertex(
+        const Distances& distances,
+        VertexId vertex_id)
+{
+    // Check that the vertex has not already been visited.
+    if (vertices_is_visited_[vertex_id]) {
+        throw std::runtime_error("");  // TODO
+    }
+
+    VertexId vertex_id_prev = vertex_ids_.back();
+    vertex_ids_.push_back(vertex_id);
+    vertices_is_visited_[vertex_id] = true;
+    distance_cur_ += distances.distance(vertex_id_prev, vertex_id);
+    distance_ = distance_cur_ + distances.distance(vertex_id, 0);
 }
 
+}
