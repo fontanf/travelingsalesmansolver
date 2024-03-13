@@ -9,7 +9,7 @@ namespace travelingsalesmansolver
 
 const Output concorde(
         const Instance& instance,
-        const Parameters& parameters);
+        const Parameters& parameters = {});
 
 template <typename Distances>
 const Output concorde(
@@ -17,6 +17,9 @@ const Output concorde(
         const Instance& instance,
         const Parameters& parameters = {});
 
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 template <typename Distances>
 const Output concorde(

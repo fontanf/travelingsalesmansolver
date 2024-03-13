@@ -41,7 +41,7 @@ public:
     /** Write to a file. */
     void write(std::ofstream& file) const
     {
-        file << "EDGE_WEIGHT_TYPE : EUC_2D" << std::endl;
+        file << "EDGE_WEIGHT_TYPE : GEO" << std::endl;
         file << "NODE_COORD_TYPE : TWOD_COORDS" << std::endl;
         file << "NODE_COORD_SECTION" << std::endl;
         for (VertexId vertex_id = 0;
@@ -88,10 +88,10 @@ public:
             double y)
     {
         double pi = 3.141592;
-        int deg_x = std::round(x);
+        int deg_x = (int)x;
         double min_x = x - deg_x;
         double latitude = pi * (deg_x + 5.0 * min_x / 3.0) / 180.0;
-        int deg_y = std::round(y);
+        int deg_y = (int)y;
         double min_y = y - deg_y;
         double longitude = pi * (deg_y + 5.0 * min_y / 3.0) / 180.0;
         distances_.vertices_[vertex_id].coordinates.x = x;

@@ -42,6 +42,7 @@ struct LkhParameters: Parameters
             << std::setw(width) << std::left << "Candidate set type: " << candidate_set_type << std::endl
             << std::setw(width) << std::left << "Initial period:  " << initial_period << std::endl
             << std::setw(width) << std::left << "Runs:  " << runs << std::endl
+            << std::setw(width) << std::left << "Max trials:  " << max_trials << std::endl
             << std::setw(width) << std::left << "Seed:  " << seed << std::endl
             << std::setw(width) << std::left << "Has candidate flle content:  " << (!candidate_file_content.empty()) << std::endl
             << std::setw(width) << std::left << "Max candidates:  " << max_candidates << std::endl
@@ -54,7 +55,9 @@ struct LkhParameters: Parameters
         json.merge_patch({
                 {"CandidateSetType", candidate_set_type},
                 {"InitialPeriod", initial_period},
-                {"seed", seed},
+                {"Runs", runs},
+                {"MaxTrials", max_trials},
+                {"Seed", seed},
                 {"HasCandidateFileContent", (!candidate_file_content.empty())},
                 {"MaxCandidates", max_candidates},
                 });
@@ -106,6 +109,10 @@ struct LkhCandidate
 
 std::vector<LkhCandidate> read_candidates(
         const std::string& candidate_file_content);
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 template <typename Distances>
 const LkhOutput lkh(
@@ -227,4 +234,3 @@ const LkhOutput lkh(
 }
 
 }
-

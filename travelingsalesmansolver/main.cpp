@@ -47,6 +47,14 @@ Output run(
     std::string algorithm = vm["algorithm"].as<std::string>();
     if (algorithm == "lkh") {
         LkhParameters parameters;
+        if (vm.count("candidate-set-type"))
+            parameters.candidate_set_type = vm["candidate-set-type"].as<std::string>();
+        if (vm.count("initial-period"))
+            parameters.initial_period = vm["initial-period"].as<std::string>();
+        if (vm.count("runs"))
+            parameters.runs = vm["runs"].as<std::string>();
+        if (vm.count("max-trials"))
+            parameters.max_trials = vm["max-trials"].as<std::string>();
         read_args(parameters, vm);
         return lkh(instance, parameters);
     } else if (algorithm == "concorde") {
@@ -69,7 +77,6 @@ int main(int argc, char *argv[])
         ("algorithm,a", po::value<std::string>()->default_value("large-neighborhood-search"), "set algorithm")
         ("input,i", po::value<std::string>()->required(), "set input file (required)")
         ("format,f", po::value<std::string>()->default_value(""), "set input file format (default: standard)")
-        ("unicost,u", "set unicost")
         ("output,o", po::value<std::string>()->default_value(""), "set JSON output file")
         ("initial-solution,", po::value<std::string>()->default_value(""), "")
         ("certificate,c", po::value<std::string>()->default_value(""), "set certificate file")
@@ -80,6 +87,11 @@ int main(int argc, char *argv[])
         ("only-write-at-the-end,e", "only write output and certificate files at the end")
         ("log,l", po::value<std::string>(), "set log file")
         ("log-to-stderr", "write log to stderr")
+
+        ("candidate-set-type,", po::value<std::string>(), "set candidate set type")
+        ("initial-period,", po::value<std::string>(), "set initial period")
+        ("runs,", po::value<std::string>(), "set runs")
+        ("max-trials,", po::value<std::string>(), "set max trials")
         ;
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -110,4 +122,3 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
