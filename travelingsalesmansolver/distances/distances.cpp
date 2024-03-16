@@ -22,5 +22,5 @@ std::ostream& Distances::format(
 void Distances::write(std::ofstream& file) const
 {
     file << "DIMENSION: " << number_of_vertices() << std::endl;
-    FUNCTION_WITH_DISTANCES(this->write, *this, file);
+    FUNCTION_WITH_DISTANCES_2(this->write, *this, file);
 }

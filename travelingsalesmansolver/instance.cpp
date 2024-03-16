@@ -61,11 +61,13 @@ std::ostream& Instance::format(
         std::ostream& os,
         int verbosity_level) const
 {
-    return FUNCTION_WITH_DISTANCES(
-            (this->Instance::format),
-            *distances_,
-            os,
-            verbosity_level);
+    if (verbosity_level >= 1) {
+        os << "Number of vertices:  " << number_of_vertices() << std::endl;
+    }
+
+    distances_->format(os, verbosity_level);
+
+    return os;
 }
 
 void Instance::write(

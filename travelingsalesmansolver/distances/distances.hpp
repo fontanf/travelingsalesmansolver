@@ -28,6 +28,19 @@ namespace travelingsalesmansolver
     (function)(*(distances).distances_geo() __VA_OPT__(,) __VA_ARGS__): \
     (function)(*(distances).distances_att() __VA_OPT__(,) __VA_ARGS__);
 
+#define FUNCTION_WITH_DISTANCES_2(function, distances, ...) \
+    ((distances).distances_euc_2d() != nullptr)? \
+    (function)(*(distances).distances_euc_2d() __VA_OPT__(,) __VA_ARGS__): \
+    ((distances).distances_ceil_2d() != nullptr)? \
+    (function)(*(distances).distances_ceil_2d() __VA_OPT__(,) __VA_ARGS__): \
+    ((distances).distances_geo() != nullptr)? \
+    (function)(*(distances).distances_geo() __VA_OPT__(,) __VA_ARGS__): \
+    ((distances).distances_att() != nullptr)? \
+    (function)(*(distances).distances_att() __VA_OPT__(,) __VA_ARGS__): \
+    ((distances).distances_explicit_triangle() != nullptr)? \
+    (function)(*(distances).distances_explicit_triangle() __VA_OPT__(,) __VA_ARGS__): \
+    (function)(*(distances).distances_explicit() __VA_OPT__(,) __VA_ARGS__);
+
 /**
  * Class that stores distance information.
  */

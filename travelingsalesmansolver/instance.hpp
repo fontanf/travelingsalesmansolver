@@ -53,13 +53,6 @@ public:
             std::ostream& os,
             int verbosity_level = 1) const;
 
-    /** Print the instance. */
-    template <typename Distances>
-    std::ostream& format(
-            const Distances& distances,
-            std::ostream& os,
-            int verbosity_level = 1) const;
-
     /** Write the instance to a file. */
     void write(
             const std::string& instance_path) const;
@@ -104,43 +97,5 @@ private:
     friend class InstanceBuilder;
 
 };
-
-template <typename Distances>
-std::ostream& Instance::format(
-        const Distances& distances,
-        std::ostream& os,
-        int verbosity_level) const
-{
-    if (verbosity_level >= 1) {
-        os << "Number of vertices:  " << number_of_vertices() << std::endl;
-    }
-
-    if (verbosity_level >= 2) {
-        os << std::endl
-            << std::setw(12) << "Loc. 1"
-            << std::setw(12) << "Loc. 2"
-            << std::setw(12) << "Distance"
-            << std::endl
-            << std::setw(12) << "------"
-            << std::setw(12) << "------"
-            << std::setw(12) << "--------"
-            << std::endl;
-        for (VertexId vertex_id_1 = 0;
-                vertex_id_1 < number_of_vertices();
-                ++vertex_id_1) {
-            for (VertexId vertex_id_2 = vertex_id_1 + 1;
-                    vertex_id_2 < number_of_vertices();
-                    ++vertex_id_2) {
-                os
-                    << std::setw(12) << vertex_id_1
-                    << std::setw(12) << vertex_id_2
-                    << std::setw(12) << distances.distance(vertex_id_1, vertex_id_2)
-                    << std::endl;
-            }
-        }
-    }
-
-    return os;
-}
 
 }
