@@ -4,12 +4,12 @@ using namespace travelingsalesmansolver;
 
 void Distances::compute_distances_explicit() const
 {
-    FUNCTION_WITH_DISTANCES(this->compute_distances_explicit, *this);
+    FUNCTION_WITH_DISTANCES_0(this->compute_distances_explicit, *this);
 }
 
 void Distances::compute_distances_explicit_triangle() const
 {
-    FUNCTION_WITH_DISTANCES(this->compute_distances_explicit_triangle, *this);
+    FUNCTION_WITH_DISTANCES_0(this->compute_distances_explicit_triangle, *this);
 }
 
 std::ostream& Distances::format(
@@ -22,5 +22,5 @@ std::ostream& Distances::format(
 void Distances::write(std::ofstream& file) const
 {
     file << "DIMENSION: " << number_of_vertices() << std::endl;
-    FUNCTION_WITH_DISTANCES_2(this->write, *this, file);
+    FUNCTION_WITH_DISTANCES_R(this->write, *this, file);
 }

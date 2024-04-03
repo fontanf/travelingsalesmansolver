@@ -15,31 +15,57 @@
 namespace travelingsalesmansolver
 {
 
+#define FUNCTION_WITH_DISTANCES_0(function, distances) \
+    ((distances).distances_explicit() != nullptr)? \
+    (function)(*(distances).distances_explicit()): \
+    ((distances).distances_explicit_triangle() != nullptr)? \
+    (function)(*(distances).distances_explicit_triangle()): \
+    ((distances).distances_euc_2d() != nullptr)? \
+    (function)(*(distances).distances_euc_2d()): \
+    ((distances).distances_ceil_2d() != nullptr)? \
+    (function)(*(distances).distances_ceil_2d()): \
+    ((distances).distances_geo() != nullptr)? \
+    (function)(*(distances).distances_geo()): \
+    (function)(*(distances).distances_att());
+
 #define FUNCTION_WITH_DISTANCES(function, distances, ...) \
     ((distances).distances_explicit() != nullptr)? \
-    (function)(*(distances).distances_explicit() __VA_OPT__(,) __VA_ARGS__): \
+    (function)(*(distances).distances_explicit(), __VA_ARGS__): \
     ((distances).distances_explicit_triangle() != nullptr)? \
-    (function)(*(distances).distances_explicit_triangle() __VA_OPT__(,) __VA_ARGS__): \
+    (function)(*(distances).distances_explicit_triangle(), __VA_ARGS__): \
     ((distances).distances_euc_2d() != nullptr)? \
-    (function)(*(distances).distances_euc_2d() __VA_OPT__(,) __VA_ARGS__): \
+    (function)(*(distances).distances_euc_2d(), __VA_ARGS__): \
     ((distances).distances_ceil_2d() != nullptr)? \
-    (function)(*(distances).distances_ceil_2d() __VA_OPT__(,) __VA_ARGS__): \
+    (function)(*(distances).distances_ceil_2d(), __VA_ARGS__): \
     ((distances).distances_geo() != nullptr)? \
-    (function)(*(distances).distances_geo() __VA_OPT__(,) __VA_ARGS__): \
-    (function)(*(distances).distances_att() __VA_OPT__(,) __VA_ARGS__);
+    (function)(*(distances).distances_geo(), __VA_ARGS__): \
+    (function)(*(distances).distances_att(), __VA_ARGS__);
 
-#define FUNCTION_WITH_DISTANCES_2(function, distances, ...) \
+#define FUNCTION_WITH_DISTANCES_0_R(function, distances) \
     ((distances).distances_euc_2d() != nullptr)? \
-    (function)(*(distances).distances_euc_2d() __VA_OPT__(,) __VA_ARGS__): \
+    (function)(*(distances).distances_euc_2d()): \
     ((distances).distances_ceil_2d() != nullptr)? \
-    (function)(*(distances).distances_ceil_2d() __VA_OPT__(,) __VA_ARGS__): \
+    (function)(*(distances).distances_ceil_2d()): \
     ((distances).distances_geo() != nullptr)? \
-    (function)(*(distances).distances_geo() __VA_OPT__(,) __VA_ARGS__): \
+    (function)(*(distances).distances_geo()): \
     ((distances).distances_att() != nullptr)? \
-    (function)(*(distances).distances_att() __VA_OPT__(,) __VA_ARGS__): \
+    (function)(*(distances).distances_att()): \
     ((distances).distances_explicit_triangle() != nullptr)? \
-    (function)(*(distances).distances_explicit_triangle() __VA_OPT__(,) __VA_ARGS__): \
-    (function)(*(distances).distances_explicit() __VA_OPT__(,) __VA_ARGS__);
+    (function)(*(distances).distances_explicit_triangle()): \
+    (function)(*(distances).distances_explicit());
+
+#define FUNCTION_WITH_DISTANCES_R(function, distances, ...) \
+    ((distances).distances_euc_2d() != nullptr)? \
+    (function)(*(distances).distances_euc_2d(), __VA_ARGS__): \
+    ((distances).distances_ceil_2d() != nullptr)? \
+    (function)(*(distances).distances_ceil_2d(), __VA_ARGS__): \
+    ((distances).distances_geo() != nullptr)? \
+    (function)(*(distances).distances_geo(), __VA_ARGS__): \
+    ((distances).distances_att() != nullptr)? \
+    (function)(*(distances).distances_att(), __VA_ARGS__): \
+    ((distances).distances_explicit_triangle() != nullptr)? \
+    (function)(*(distances).distances_explicit_triangle(), __VA_ARGS__): \
+    (function)(*(distances).distances_explicit(), __VA_ARGS__);
 
 /**
  * Class that stores distance information.
