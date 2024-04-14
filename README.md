@@ -16,13 +16,20 @@ Both solvers are called through system calls. Inputs and outputs are handled thr
 
 Compile:
 ```shell
-bazel build -- //...
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel
+cmake --install build --config Release --prefix install
+```
+
+Download data:
+```shell
+python3 scripts/download_data.py
 ```
 
 Examples:
 
 ```shell
-./bazel-bin/travelingsalesmansolver/main -v 1 -i ./data/tsplib/a280.tsp -a concorde
+./install/bin/travelingsalesmansolver -v 1 -i ./data/tsplib/a280.tsp -a concorde
 ```
 ```
 =====================================
