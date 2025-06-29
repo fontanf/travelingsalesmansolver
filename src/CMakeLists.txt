@@ -15,12 +15,14 @@ add_library(TravelingSalesmanSolver::traveling_salesman ALIAS TravelingSalesmanS
 
 add_subdirectory(algorithms)
 
-add_executable(TravelingSalesmanSolver_main)
-target_sources(TravelingSalesmanSolver_main PRIVATE
-    main.cpp)
-target_link_libraries(TravelingSalesmanSolver_main PUBLIC
-    TravelingSalesmanSolver_lkh
-    TravelingSalesmanSolver_concorde
-    Boost::program_options)
-set_target_properties(TravelingSalesmanSolver_main PROPERTIES OUTPUT_NAME "travelingsalesmansolver")
-install(TARGETS TravelingSalesmanSolver_main)
+if(TRAVELINGSALESMANSOLVER_BUILD_MAIN)
+  add_executable(TravelingSalesmanSolver_main)
+  target_sources(TravelingSalesmanSolver_main PRIVATE
+      main.cpp)
+  target_link_libraries(TravelingSalesmanSolver_main PUBLIC
+      TravelingSalesmanSolver_lkh
+      TravelingSalesmanSolver_concorde
+      Boost::program_options)
+  set_target_properties(TravelingSalesmanSolver_main PROPERTIES OUTPUT_NAME "travelingsalesmansolver")
+  install(TARGETS TravelingSalesmanSolver_main)
+endif()
