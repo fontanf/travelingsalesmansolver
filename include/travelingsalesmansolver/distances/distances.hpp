@@ -3,6 +3,7 @@
 #include "travelingsalesmansolver/distances/distances_explicit.hpp"
 #include "travelingsalesmansolver/distances/distances_explicit_triangle.hpp"
 #include "travelingsalesmansolver/distances/distances_euc_2d.hpp"
+#include "travelingsalesmansolver/distances/distances_euc_2d_unrounded.hpp"
 #include "travelingsalesmansolver/distances/distances_ceil_2d.hpp"
 #include "travelingsalesmansolver/distances/distances_geo.hpp"
 #include "travelingsalesmansolver/distances/distances_att.hpp"
@@ -22,6 +23,8 @@ namespace travelingsalesmansolver
     (function)(*(distances).distances_explicit_triangle()): \
     ((distances).distances_euc_2d() != nullptr)? \
     (function)(*(distances).distances_euc_2d()): \
+    ((distances).distances_euc_2d_unrounded() != nullptr)? \
+    (function)(*(distances).distances_euc_2d_unrounded()): \
     ((distances).distances_ceil_2d() != nullptr)? \
     (function)(*(distances).distances_ceil_2d()): \
     ((distances).distances_geo() != nullptr)? \
@@ -35,6 +38,8 @@ namespace travelingsalesmansolver
     (function)(*(distances).distances_explicit_triangle(), __VA_ARGS__): \
     ((distances).distances_euc_2d() != nullptr)? \
     (function)(*(distances).distances_euc_2d(), __VA_ARGS__): \
+    ((distances).distances_euc_2d_unrounded() != nullptr)? \
+    (function)(*(distances).distances_euc_2d_unrounded(), __VA_ARGS__): \
     ((distances).distances_ceil_2d() != nullptr)? \
     (function)(*(distances).distances_ceil_2d(), __VA_ARGS__): \
     ((distances).distances_geo() != nullptr)? \
@@ -44,6 +49,8 @@ namespace travelingsalesmansolver
 #define FUNCTION_WITH_DISTANCES_0_R(function, distances) \
     ((distances).distances_euc_2d() != nullptr)? \
     (function)(*(distances).distances_euc_2d()): \
+    ((distances).distances_euc_2d_unrounded() != nullptr)? \
+    (function)(*(distances).distances_euc_2d_unrounded()): \
     ((distances).distances_ceil_2d() != nullptr)? \
     (function)(*(distances).distances_ceil_2d()): \
     ((distances).distances_geo() != nullptr)? \
@@ -57,6 +64,8 @@ namespace travelingsalesmansolver
 #define FUNCTION_WITH_DISTANCES_R(function, distances, ...) \
     ((distances).distances_euc_2d() != nullptr)? \
     (function)(*(distances).distances_euc_2d(), __VA_ARGS__): \
+    ((distances).distances_euc_2d_unrounded() != nullptr)? \
+    (function)(*(distances).distances_euc_2d_unrounded(), __VA_ARGS__): \
     ((distances).distances_ceil_2d() != nullptr)? \
     (function)(*(distances).distances_ceil_2d(), __VA_ARGS__): \
     ((distances).distances_geo() != nullptr)? \
@@ -103,6 +112,8 @@ public:
     const DistancesExplicitTriangle* distances_explicit_triangle() const { return distances_explicit_triangle_.get(); }
 
     const DistancesEuc2D* distances_euc_2d() const { return distances_euc_2d_.get(); }
+
+    const DistancesEuc2DUnrounded* distances_euc_2d_unrounded() const { return distances_euc_2d_unrounded_.get(); }
 
     const DistancesCeil2D* distances_ceil_2d() const { return distances_ceil_2d_.get(); }
 
@@ -155,6 +166,8 @@ private:
     mutable std::unique_ptr<const DistancesExplicitTriangle> distances_explicit_triangle_ = nullptr;
 
     std::unique_ptr<const DistancesEuc2D> distances_euc_2d_ = nullptr;
+
+    std::unique_ptr<const DistancesEuc2DUnrounded> distances_euc_2d_unrounded_ = nullptr;
 
     std::unique_ptr<const DistancesCeil2D> distances_ceil_2d_ = nullptr;
 
