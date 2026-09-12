@@ -30,6 +30,7 @@ TEnvironment::~TEnvironment(){
 	delete [] tCurPop;
 	delete fEvaluator;
 	delete tCross;
+	delete tKopt;
 }
 
 void TEnvironment::define(){

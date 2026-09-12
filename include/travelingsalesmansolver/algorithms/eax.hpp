@@ -64,7 +64,13 @@ const Output eax(
 
     // The vendored implementation relies on process-wide global state
     // ('tRand', 'tSort'), so this function is not re-entrant / thread-safe.
+    // 'InitSort()' is never called anywhere in the original upstream
+    // repository either (including its own 'main.cpp'), leaving 'tSort'
+    // null until the GA reaches its "Block2" eset stage (only reached
+    // after enough stalled generations, so small/quick-converging
+    // instances never hit it) and dereferences it in 'TCross'.
     eax_ga::InitURandom(parameters.seed);
+    eax_ga::InitSort();
 
     eax_ga::TEnvironment environment;
     environment.Npop = parameters.population_size;
