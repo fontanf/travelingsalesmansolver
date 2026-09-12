@@ -49,14 +49,20 @@ TCross::TCross( int N ){
 	fOrder.resize(fN);
 	fInv.resize(fN);
 
+	// 'fNumOfSPL'/'fNumOfSeg' are accumulated across every AB-cycle applied
+	// within one crossover call (see 'changeSol()'/'makeUnit()'), which in
+	// the "Block2" eset mode (multiple AB-cycles per call) can exceed 'fN'
+	// even though each individual position is a valid index into a tour of
+	// 'fN' cities; size these generously (matching 'fRoute'/'fC' elsewhere
+	// in this file) rather than assuming the count is bounded by 'fN'.
 	fSegment.clear();
-	for (int i = 0; i < fN; i++) {
+	for (int i = 0; i < 2 * fN; i++) {
 		vector<int> row(2);
 		fSegment.push_back(row);
 	}
 
-	fSegUnit.resize(fN);
-	fSegPosiList.resize(fN);
+	fSegUnit.resize(2 * fN);
+	fSegPosiList.resize(2 * fN);
 	LinkAPosi.resize(fN);
 
 	LinkBPosi.clear();
@@ -988,7 +994,7 @@ double TCross::calEntLoss(vector<vector<int>>& fEdgeFreq){
 	}
 	DLoss = -DLoss;
 
-	// ¸üÐÂ EdgeFreq
+	// ï¿½ï¿½ï¿½ï¿½ EdgeFreq
 	for( int s = 0; s < fNumOfAppliedCycle; ++s ){
 		jnum = fAppliedCylce[ s ];
 
