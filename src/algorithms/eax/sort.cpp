@@ -18,7 +18,7 @@ namespace eax_ga
 TSort* tSort = NULL;
 
 void InitSort(){
-	tSort = new TSort();
+	if( tSort == NULL ) tSort = new TSort();
 }
 
 void swap(int &x, int &y){
