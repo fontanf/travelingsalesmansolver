@@ -15,3 +15,26 @@ target_include_directories(TravelingSalesmanSolver_lkh PUBLIC
 target_link_libraries(TravelingSalesmanSolver_lkh PUBLIC
     TravelingSalesmanSolver_traveling_salesman)
 add_library(TravelingSalesmanSolver::lkh ALIAS TravelingSalesmanSolver_lkh)
+
+add_library(TravelingSalesmanSolver_eax_ga)
+target_sources(TravelingSalesmanSolver_eax_ga PRIVATE
+    eax/cross.cpp
+    eax/environment.cpp
+    eax/evaluator.cpp
+    eax/indi.cpp
+    eax/kopt.cpp
+    eax/randomize.cpp
+    eax/sort.cpp)
+target_include_directories(TravelingSalesmanSolver_eax_ga PUBLIC
+    ${PROJECT_SOURCE_DIR}/include)
+add_library(TravelingSalesmanSolver::eax_ga ALIAS TravelingSalesmanSolver_eax_ga)
+
+add_library(TravelingSalesmanSolver_eax)
+target_sources(TravelingSalesmanSolver_eax PRIVATE
+    eax.cpp)
+target_include_directories(TravelingSalesmanSolver_eax PUBLIC
+    ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(TravelingSalesmanSolver_eax PUBLIC
+    TravelingSalesmanSolver_traveling_salesman
+    TravelingSalesmanSolver_eax_ga)
+add_library(TravelingSalesmanSolver::eax ALIAS TravelingSalesmanSolver_eax)

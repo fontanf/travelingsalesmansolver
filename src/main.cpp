@@ -1,5 +1,6 @@
 #include "travelingsalesmansolver/algorithms/lkh.hpp"
 #include "travelingsalesmansolver/algorithms/concorde.hpp"
+#include "travelingsalesmansolver/algorithms/eax.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -62,6 +63,16 @@ Output run(
         read_args(parameters, vm);
         return concorde(instance, parameters);
 
+    } else if (algorithm == "eax") {
+        EaxParameters parameters;
+        if (vm.count("population-size"))
+            parameters.population_size = vm["population-size"].as<int>();
+        if (vm.count("number-of-children"))
+            parameters.number_of_children = vm["number-of-children"].as<int>();
+        parameters.seed = vm["seed"].as<Seed>();
+        read_args(parameters, vm);
+        return eax(instance, parameters);
+
     } else {
         throw std::invalid_argument(
                 "Unknown algorithm \"" + algorithm + "\".");
@@ -92,6 +103,9 @@ int main(int argc, char *argv[])
         ("initial-period,", po::value<std::string>(), "set initial period")
         ("runs,", po::value<std::string>(), "set runs")
         ("max-trials,", po::value<std::string>(), "set max trials")
+
+        ("population-size,", po::value<int>(), "set EAX population size")
+        ("number-of-children,", po::value<int>(), "set EAX number of children per generation")
         ;
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
