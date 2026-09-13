@@ -38,6 +38,9 @@ public:
         return (Distance)(rrr * acos(0.5 * ((1.0 + q1) * q2 - (1.0 - q1) * q3)) + 1.0);
     }
 
+    /** Get the (pre-conversion) coordinates of a vertex. */
+    inline const Coordinates2D& coordinates(VertexId vertex_id) const { return vertices_[vertex_id].coordinates; }
+
     /** Write to a file. */
     void write(std::ofstream& file) const
     {

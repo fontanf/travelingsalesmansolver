@@ -39,6 +39,9 @@ public:
         return (Distance)std::llround(std::sqrt(xd * xd + yd * yd) * (double)scale());
     }
 
+    /** Get the coordinates of a vertex. */
+    inline const Coordinates2D& coordinates(VertexId vertex_id) const { return vertices_[vertex_id]; }
+
     /** Write to a file. */
     void write(std::ofstream& file) const
     {
