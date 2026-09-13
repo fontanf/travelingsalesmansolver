@@ -47,21 +47,6 @@ const Output eax(
 
     VertexId number_of_vertices = instance.number_of_vertices();
 
-    // Build the distance matrix expected by the vendored EAX-TSP
-    // implementation (it works with plain 'int' distances, not the
-    // travelingsalesmansolver-wide 'Distance' type).
-    std::vector<std::vector<int>> distance_matrix(
-            number_of_vertices,
-            std::vector<int>(number_of_vertices, 0));
-    for (VertexId vertex_id_1 = 0; vertex_id_1 < number_of_vertices; ++vertex_id_1) {
-        for (VertexId vertex_id_2 = 0; vertex_id_2 < number_of_vertices; ++vertex_id_2) {
-            if (vertex_id_1 != vertex_id_2) {
-                distance_matrix[vertex_id_1][vertex_id_2]
-                    = (int)distances.distance(vertex_id_1, vertex_id_2);
-            }
-        }
-    }
-
     // The vendored implementation relies on process-wide global state
     // ('tRand', 'tSort'), so this function is not re-entrant / thread-safe.
     // 'InitSort()' is never called anywhere in the original upstream
@@ -72,12 +57,15 @@ const Output eax(
     eax_ga::InitURandom(parameters.seed);
     eax_ga::InitSort();
 
-    eax_ga::TEnvironment environment;
+    // 'distances' is looked up directly by 'TEvaluator<Distances>' (see
+    // 'evaluator.hpp'), dispatched once here via the 'Distances' template
+    // parameter -- no distance is ever copied into a separate matrix, the
+    // same way every other algorithm in this library consumes distances.
+    eax_ga::TEnvironment<Distances> environment(distances, number_of_vertices);
     environment.Npop = parameters.population_size;
     environment.Nch = parameters.number_of_children;
-    environment.fEvaluator->setInstance(number_of_vertices, distance_matrix);
     environment.fTimeLimit = parameters.timer.remaining_time();
-    environment.defineFromEvaluator();
+    environment.define();
     environment.doIt();
 
     std::vector<int> tour = environment.fEvaluator->getTour(environment.tBest);

@@ -8,6 +8,8 @@
 #ifndef __INDI__
 #define __INDI__
 
+#include "travelingsalesmansolver/distances/commons.hpp"
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +31,7 @@ public:
 
 	int fN; // the number of cities
 	int** fLink; // fLink[i][] is the two adjacent cities of city i
-	int fEvaluationValue; // the road length of TSP
+	Distance fEvaluationValue; // the road length of TSP
 };
 
 

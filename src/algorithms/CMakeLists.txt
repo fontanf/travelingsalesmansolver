@@ -18,11 +18,7 @@ add_library(TravelingSalesmanSolver::lkh ALIAS TravelingSalesmanSolver_lkh)
 
 add_library(TravelingSalesmanSolver_eax_ga)
 target_sources(TravelingSalesmanSolver_eax_ga PRIVATE
-    eax/cross.cpp
-    eax/environment.cpp
-    eax/evaluator.cpp
     eax/indi.cpp
-    eax/kopt.cpp
     eax/randomize.cpp
     eax/sort.cpp)
 target_include_directories(TravelingSalesmanSolver_eax_ga PUBLIC
