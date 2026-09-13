@@ -26,6 +26,9 @@ public:
         return (tij < rij)? tij + 1: tij;
     }
 
+    /** Get the coordinates of a vertex. */
+    inline const Coordinates2D& coordinates(VertexId vertex_id) const { return vertices_[vertex_id]; }
+
     /** Write to a file. */
     void write(std::ofstream& file) const
     {
