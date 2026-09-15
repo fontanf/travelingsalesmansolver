@@ -194,7 +194,8 @@ const LkhOutput lkh(
             VertexId vertex_id = -1;
             solution_file >> vertex_id;
             for (;;) {
-                solution_file >> vertex_id;
+                if (!(solution_file >> vertex_id))
+                    break;
                 if (vertex_id == -1)
                     break;
                 solution.add_vertex(distances, vertex_id - 1);
