@@ -5,6 +5,8 @@
 #include "travelingsalesmansolver/algorithms/temp_file.hpp"
 
 #include <iomanip>
+#include <iostream>
+#include <sstream>
 
 namespace travelingsalesmansolver
 {
@@ -182,6 +184,16 @@ const LkhOutput lkh(
     if (!solution_file.good()) {
         throw std::runtime_error(
                 "Unable to open file \"" + std::string(solution_path) + "\".");
+    }
+
+    {
+        std::stringstream debug_ss;
+        debug_ss << solution_file.rdbuf();
+        std::cerr << "[debug] tour file content:" << std::endl
+            << debug_ss.str() << std::endl
+            << "[debug] end of tour file content" << std::endl;
+        solution_file.clear();
+        solution_file.seekg(0);
     }
 
     Solution solution(instance);
