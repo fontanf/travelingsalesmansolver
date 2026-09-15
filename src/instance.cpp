@@ -33,6 +33,8 @@ void Instance::read_tsplib(std::ifstream& file)
     std::string tmp;
     std::vector<std::string> line;
     while (getline(file, tmp)) {
+        optimizationtools::rtrim(tmp);
+        optimizationtools::ltrim(tmp);
         line = optimizationtools::split(tmp);
         if (line.size() == 0) {
         } else if (distances_builder.read_tsplib(file, tmp, line)) {

@@ -1,0 +1,59 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+
+  build:
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.11"]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install build tools (Linux)
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install build-essential
+      if: matrix.os == 'ubuntu-latest'
+    - name: Install Concorde and LKH (Linux, macOS)
+      run: python3 -u scripts/install_solvers.py
+      if: matrix.os != 'windows-latest'
+    - name: Install LKH (Windows)
+      # Concorde has no supported native Windows build (its own
+      # documentation lists Windows as unsupported without a Cygwin
+      # environment), so only LKH is installed there.
+      run: python3 -u scripts/install_solvers.py --solvers lkh
+      if: matrix.os == 'windows-latest'
+    - name: Build
+      run: |
+        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        cmake --build build --config Release --parallel
+        cmake --install build --config Release --prefix install
+    - name: Download test data
+      run: |
+        pip install -r requirements.txt
+        python3 -u scripts/download_data.py
+    - name: Run tests (Linux, macOS)
+      run: python3 -u scripts/run_tests.py test_results
+      if: matrix.os != 'windows-latest'
+    - name: Run tests (Windows)
+      # Concorde is not installed on Windows, see above.
+      run: python3 -u scripts/run_tests.py test_results --tests lkh
+      if: matrix.os == 'windows-latest'
