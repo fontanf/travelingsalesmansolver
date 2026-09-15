@@ -4,9 +4,8 @@
 #include "travelingsalesmansolver/algorithm_formatter.hpp"
 #include "travelingsalesmansolver/algorithms/temp_file.hpp"
 
+#include <algorithm>
 #include <iomanip>
-#include <iostream>
-#include <sstream>
 
 namespace travelingsalesmansolver
 {
@@ -186,16 +185,6 @@ const LkhOutput lkh(
                 "Unable to open file \"" + std::string(solution_path) + "\".");
     }
 
-    {
-        std::stringstream debug_ss;
-        debug_ss << solution_file.rdbuf();
-        std::cerr << "[debug] tour file content:" << std::endl
-            << debug_ss.str() << std::endl
-            << "[debug] end of tour file content" << std::endl;
-        solution_file.clear();
-        solution_file.seekg(0);
-    }
-
     Solution solution(instance);
     std::string tmp;
     std::vector<std::string> line;
@@ -203,14 +192,29 @@ const LkhOutput lkh(
         line = optimizationtools::split(tmp, ' ');
         if (line.size() == 0) {
         } else if (tmp.rfind("TOUR_SECTION", 0) == 0) {
-            VertexId vertex_id = -1;
-            solution_file >> vertex_id;
-            for (;;) {
-                if (!(solution_file >> vertex_id))
-                    break;
+            // The tour can start at any vertex, not necessarily the one
+            // 'Solution' is already initialized with, so read the whole
+            // cycle first and then add the other vertices starting right
+            // after that one.
+            std::vector<VertexId> tour_vertex_ids;
+            VertexId vertex_id;
+            while (solution_file >> vertex_id) {
                 if (vertex_id == -1)
                     break;
-                solution.add_vertex(distances, vertex_id - 1);
+                tour_vertex_ids.push_back(vertex_id - 1);
+            }
+            auto it = std::find(
+                    tour_vertex_ids.begin(),
+                    tour_vertex_ids.end(),
+                    solution.vertex_id(0));
+            if (it != tour_vertex_ids.end()) {
+                VertexPos start = std::distance(tour_vertex_ids.begin(), it);
+                VertexPos n = (VertexPos)tour_vertex_ids.size();
+                for (VertexPos i = 1; i < n; ++i) {
+                    solution.add_vertex(
+                            distances,
+                            tour_vertex_ids[(start + i) % n]);
+                }
             }
         }
     }
