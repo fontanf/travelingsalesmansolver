@@ -106,19 +106,24 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Build instance.
-    const Instance instance(
-            vm["input"].as<std::string>(),
-            vm["format"].as<std::string>());
+    try {
+        // Build instance.
+        const Instance instance(
+                vm["input"].as<std::string>(),
+                vm["format"].as<std::string>());
 
-    // Run.
-    Output output = run(instance, vm);
+        // Run.
+        Output output = run(instance, vm);
 
-    // Write outputs.
-    std::string certificate_path = vm["certificate"].as<std::string>();
-    std::string json_output_path = vm["output"].as<std::string>();
-    output.write_json_output(json_output_path);
-    output.solution.write(certificate_path);
+        // Write outputs.
+        std::string certificate_path = vm["certificate"].as<std::string>();
+        std::string json_output_path = vm["output"].as<std::string>();
+        output.write_json_output(json_output_path);
+        output.solution.write(certificate_path);
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
 
     return 0;
 }

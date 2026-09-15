@@ -2,7 +2,9 @@
 
 #include "travelingsalesmansolver/solution.hpp"
 #include "travelingsalesmansolver/algorithm_formatter.hpp"
+#include "travelingsalesmansolver/algorithms/temp_file.hpp"
 
+#include <algorithm>
 #include <iomanip>
 
 namespace travelingsalesmansolver
@@ -126,13 +128,11 @@ const LkhOutput lkh(
     algorithm_formatter.print_header();
 
     // Write instance file.
-    char instance_path[L_tmpnam];
-    tmpnam(instance_path);
+    std::string instance_path = make_temp_path("tsls_lkh_instance_");
     instance.write(instance_path);
 
     // Write parameters file.
-    char parameters_path[L_tmpnam];
-    tmpnam(parameters_path);
+    std::string parameters_path = make_temp_path("tsls_lkh_parameters_");
 
     std::ofstream parameters_file(parameters_path);
     if (!parameters_file.good()) {
@@ -141,8 +141,7 @@ const LkhOutput lkh(
     }
 
     parameters_file << "PROBLEM_FILE = " << instance_path << std::endl;
-    char solution_path[L_tmpnam];
-    tmpnam(solution_path);
+    std::string solution_path = make_temp_path("tsls_lkh_solution_");
     parameters_file << "OUTPUT_TOUR_FILE = " << solution_path << std::endl;
     if (parameters.timer.time_limit() != std::numeric_limits<double>::infinity())
         parameters_file << "TIME_LIMIT = " << parameters.timer.remaining_time() << std::endl;
@@ -160,8 +159,7 @@ const LkhOutput lkh(
         parameters_file << "MAX_CANDIDATES = " << parameters.max_candidates << std::endl;
 
     // Candidate file.
-    char candidate_path[L_tmpnam];
-    tmpnam(candidate_path);
+    std::string candidate_path = make_temp_path("tsls_lkh_candidate_");
     parameters_file << "CANDIDATE_FILE  = " << candidate_path << std::endl;
     if (!parameters.candidate_file_content.empty()) {
         std::ofstream candidate_file(candidate_path);
@@ -173,8 +171,7 @@ const LkhOutput lkh(
     }
 
     // Run.
-    char output_path[L_tmpnam];
-    tmpnam(output_path);
+    std::string output_path = make_temp_path("tsls_lkh_output_");
     std::string command = (
             "LKH"
             " \"" + std::string(parameters_path) + "\""
@@ -195,13 +192,29 @@ const LkhOutput lkh(
         line = optimizationtools::split(tmp, ' ');
         if (line.size() == 0) {
         } else if (tmp.rfind("TOUR_SECTION", 0) == 0) {
-            VertexId vertex_id = -1;
-            solution_file >> vertex_id;
-            for (;;) {
-                solution_file >> vertex_id;
+            // The tour can start at any vertex, not necessarily the one
+            // 'Solution' is already initialized with, so read the whole
+            // cycle first and then add the other vertices starting right
+            // after that one.
+            std::vector<VertexId> tour_vertex_ids;
+            VertexId vertex_id;
+            while (solution_file >> vertex_id) {
                 if (vertex_id == -1)
                     break;
-                solution.add_vertex(distances, vertex_id - 1);
+                tour_vertex_ids.push_back(vertex_id - 1);
+            }
+            auto it = std::find(
+                    tour_vertex_ids.begin(),
+                    tour_vertex_ids.end(),
+                    solution.vertex_id(0));
+            if (it != tour_vertex_ids.end()) {
+                VertexPos start = std::distance(tour_vertex_ids.begin(), it);
+                VertexPos n = (VertexPos)tour_vertex_ids.size();
+                for (VertexPos i = 1; i < n; ++i) {
+                    solution.add_vertex(
+                            distances,
+                            tour_vertex_ids[(start + i) % n]);
+                }
             }
         }
     }
@@ -220,11 +233,11 @@ const LkhOutput lkh(
     }
 
     // Remove temporary files.
-    std::remove(instance_path);
-    std::remove(parameters_path);
-    std::remove(solution_path);
-    std::remove(output_path);
-    std::remove(candidate_path);
+    std::remove(instance_path.c_str());
+    std::remove(parameters_path.c_str());
+    std::remove(solution_path.c_str());
+    std::remove(output_path.c_str());
+    std::remove(candidate_path.c_str());
 
     // Update output.
     algorithm_formatter.update_solution(solution, "Final solution");

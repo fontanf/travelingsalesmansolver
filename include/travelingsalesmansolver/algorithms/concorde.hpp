@@ -3,6 +3,7 @@
 #include "travelingsalesmansolver/solution.hpp"
 
 #include "travelingsalesmansolver/algorithm_formatter.hpp"
+#include "travelingsalesmansolver/algorithms/temp_file.hpp"
 
 namespace travelingsalesmansolver
 {
@@ -33,15 +34,12 @@ const Output concorde(
     algorithm_formatter.print_header();
 
     // Write instance file.
-    char instance_path[L_tmpnam];
-    tmpnam(instance_path);
+    std::string instance_path = make_temp_path("tsls_concorde_instance_");
     instance.write(instance_path);
 
     // Run.
-    char output_path[L_tmpnam];
-    tmpnam(output_path);
-    char solution_path[L_tmpnam];
-    tmpnam(solution_path);
+    std::string output_path = make_temp_path("tsls_concorde_output_");
+    std::string solution_path = make_temp_path("tsls_concorde_solution_");
     std::string command = (
             "concorde"
             " -x"  // delete files on completion (sav pul mas)
@@ -67,12 +65,12 @@ const Output concorde(
     }
 
     // Remove temporary files.
-    std::remove(instance_path);
+    std::remove(instance_path.c_str());
     std::string sol_path = instance_path;
     sol_path = sol_path.substr(sol_path.find_last_of("/\\") + 1) + ".sol";
     std::remove(sol_path.c_str());
-    std::remove(solution_path);
-    std::remove(output_path);
+    std::remove(solution_path.c_str());
+    std::remove(output_path.c_str());
 
     // Update output.
     algorithm_formatter.update_solution(solution, "final solution");
