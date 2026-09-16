@@ -81,6 +81,17 @@ public:
         set_ = true;
     }
 
+    /** Set Man2D distances. */
+    void set_distances_man_2d(
+            const DistancesMan2D& distances_man_2d)
+    {
+        if (set_) {
+            throw std::invalid_argument("Distances has already been set.");
+        }
+        distances_.distances_man_2d_ = std::make_unique<const DistancesMan2D>(distances_man_2d);
+        set_ = true;
+    }
+
     /** Set Geo distances. */
     void set_distances_geo(
             const DistancesGeo& distances_geo)
