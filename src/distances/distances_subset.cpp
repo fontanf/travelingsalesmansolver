@@ -103,6 +103,23 @@ Distances distances_subset_impl(
 }
 
 Distances distances_subset_impl(
+        const DistancesMan2D& distances,
+        const std::vector<VertexId>& vertex_ids)
+{
+    VertexId number_of_vertices = (VertexId)vertex_ids.size();
+    DistancesMan2DBuilder distances_man_2d_builder;
+    distances_man_2d_builder.set_number_of_vertices(number_of_vertices);
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
+        const Coordinates2D& coordinates = distances.coordinates(vertex_ids[vertex_id]);
+        distances_man_2d_builder.set_coordinates(vertex_id, coordinates.x, coordinates.y);
+    }
+    DistancesBuilder distances_builder;
+    distances_builder.set_number_of_vertices(number_of_vertices);
+    distances_builder.set_distances_man_2d(distances_man_2d_builder.build());
+    return distances_builder.build();
+}
+
+Distances distances_subset_impl(
         const DistancesGeo& distances,
         const std::vector<VertexId>& vertex_ids)
 {

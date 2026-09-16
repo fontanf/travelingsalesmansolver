@@ -152,6 +152,19 @@ bool DistancesBuilder::read_tsplib(
                 }
                 set_distances_ceil_2d(distances_ceil_2d_builder.build());
 
+            } else if (edge_weight_type_ == "MAN_2D") {
+                DistancesMan2DBuilder distances_man_2d_builder;
+                distances_man_2d_builder.set_number_of_vertices(distances_.number_of_vertices_);
+                for (VertexId vertex_id = 0;
+                        vertex_id < distances_.number_of_vertices_;
+                        ++vertex_id) {
+                    distances_man_2d_builder.set_coordinates(
+                            vertex_id,
+                            coordinates_2d[vertex_id].x,
+                            coordinates_2d[vertex_id].y);
+                }
+                set_distances_man_2d(distances_man_2d_builder.build());
+
             } else if (edge_weight_type_ == "GEO") {
                 DistancesGeoBuilder distances_geo_builder;
                 distances_geo_builder.set_number_of_vertices(distances_.number_of_vertices_);
