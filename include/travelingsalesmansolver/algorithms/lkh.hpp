@@ -31,6 +31,25 @@ struct LkhParameters: Parameters
     /** MAX_CANDIDATES. */
     std::string max_candidates;
 
+    /**
+     * SUBGRADIENT ("YES" or "NO"). Empty leaves it at LKH's own default
+     * ("YES").
+     *
+     * With "NO", 'Ascent()' returns as soon as it has a minimum 1-tree cost,
+     * skipping the whole subgradient optimization loop that would otherwise
+     * follow (used to refine the Pi-values / alpha-nearness measure): on
+     * large instances (tens of thousands of vertices or more) that loop's
+     * cost grows with the instance size on both axes at once (more outer
+     * periods and more inner iterations per period), each iteration
+     * recomputing a minimum 1-tree over every vertex -- and, critically,
+     * time is only checked between *whole* periods, not between the
+     * (possibly very numerous) inner iterations of one, so 'TIME_LIMIT'
+     * above can be overshot by however long a single period takes to run,
+     * independent of 'CANDIDATE_SET_TYPE' (this still runs after candidate
+     * generation, POPMUSIC included).
+     */
+    std::string subgradient;
+
 
     virtual int format_width() const override { return 37; }
 
@@ -46,6 +65,7 @@ struct LkhParameters: Parameters
             << std::setw(width) << std::left << "Seed:  " << seed << std::endl
             << std::setw(width) << std::left << "Has candidate flle content:  " << (!candidate_file_content.empty()) << std::endl
             << std::setw(width) << std::left << "Max candidates:  " << max_candidates << std::endl
+            << std::setw(width) << std::left << "Subgradient:  " << subgradient << std::endl
             ;
     }
 
@@ -60,6 +80,7 @@ struct LkhParameters: Parameters
                 {"Seed", seed},
                 {"HasCandidateFileContent", (!candidate_file_content.empty())},
                 {"MaxCandidates", max_candidates},
+                {"Subgradient", subgradient},
                 });
         return json;
     }
@@ -158,6 +179,8 @@ const LkhOutput lkh(
         parameters_file << "SEED = " << parameters.seed << std::endl;
     if (!parameters.max_candidates.empty())
         parameters_file << "MAX_CANDIDATES = " << parameters.max_candidates << std::endl;
+    if (!parameters.subgradient.empty())
+        parameters_file << "SUBGRADIENT = " << parameters.subgradient << std::endl;
 
     // Candidate file.
     char candidate_path[L_tmpnam];
