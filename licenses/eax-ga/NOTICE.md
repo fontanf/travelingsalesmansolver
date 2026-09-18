@@ -9,8 +9,10 @@ Licensed under the Apache License, Version 2.0; see the `LICENSE` file in
 this directory for the full text.
 
 Changes made to the original source:
-- Renamed `.h` headers to `.hpp` and namespaced everything under
-  `travelingsalesmansolver::eax_ga`.
+- Renamed `.h` headers to `.hpp` and namespaced everything under an
+  anonymous namespace nested inside `travelingsalesmansolver` (originally
+  a named `travelingsalesmansolver::eax_ga`; see further down for why this
+  changed).
 - `TEvaluator`, `TCross`, `TKopt`, and `TEnvironment` are now templated on
   a `Distances` type and hold a `const Distances&` (via `TEvaluator`)
   instead of copying distances into an `int` matrix (`fEdgeDis`) or reading
@@ -66,11 +68,7 @@ project's conventions (PascalCase types with no `T`-prefix, e.g. `TEnvironment`
 `f`-prefix, e.g. `fEvaluator` -> `evaluator_`), and every raw `new[]`/`delete[]`
 array was replaced by `std::vector`/`std::array`, with the two-phase
 `define()`-after-construction pattern replaced by ordinary constructors
-(RAII). Ultra-local single/two-letter variables inside the crossover and
-k-opt inner loops (`r1`/`r2`/`b1`/`b2`, `aa`/`bb`/`a1`/`b1`, `cem`/`ci`/`pr`/`st`,
-etc. — these mirror the EAX paper's own red/blue-edge notation) were
-deliberately left as-is, to avoid transcription risk in this delicate,
-index-heavy code.
+(RAII).
 
 `TRandom`/`tRand` and `TSort`/`tSort` — two lazily-allocated global-pointer
 singletons wrapping the C `rand()` function and a handful of stateless sort
@@ -80,8 +78,8 @@ etc.), removing the process-wide global mutable state and the non-reentrancy
 hazard around `InitSort()` that a comment in this file used to document
 (`tSort` staying null until the GA reached a "Block2" eset stage, which only
 small/quick-converging instances never hit). `InitURandom`/`InitSort`
-themselves are gone; the equivalent seeding is `eax_ga::seed_random(seed)`,
-called once from `eax()`.
+themselves are gone; the equivalent seeding is `seed_random(seed)`, called
+once from `eax()`.
 
 The following genuinely dead code (unreachable from `eax()`, left over from
 the original's un-vendored interactive `main.cpp` driver) was removed:
@@ -125,7 +123,28 @@ local/member name collisions found during that pass (`form_ab_cycle()`'s and
 `make_complete_sol()`'s own locals happening to shadow `trace_start_`/
 `current_city_`/`random_pick_` after the first pass's renames, unlike the
 `distance_ab_` case above, self-contained and never read back through the
-member) were resolved by giving the locals distinct names entirely. Ultra-local
-single/two-letter variables that mirror the EAX paper's own red/blue-edge
-notation (`r1`/`r2`/`b1`/`b2`, `aa`/`bb`/`a1`/`b1`) were kept as-is throughout,
-consistent with `KOpt`.
+member) were resolved by giving the locals distinct names entirely. That
+pass deliberately kept the EAX paper's own red/blue-edge notation
+(`r1`/`r2`/`b1`/`b2`, `aa`/`bb`/`a1`/`b1`) as-is.
+
+A third pass superseded that last call: every vertex/city-id-valued
+variable, parameter, and member across all five classes (`Individual`,
+`Evaluator`, `KOpt`, `Cross`, `Environment`) and `eax.cpp` was retyped from
+`int` to this project's `VertexId` (`int64_t`) — the type every
+`Distances::distance(...)` overload already took, so these were previously
+narrowed on every call — and every single/two-letter vertex-id variable was
+renamed to `vertex_id`/`vertex_id_1`/`vertex_id_2`/... or, where the EAX
+paper's red/blue-edge roles would otherwise be lost, to role-based names
+(`red_vertex_id_1`/`red_vertex_id_2`/`blue_vertex_id_1`/`blue_vertex_id_2`
+for `r1`/`r2`/`b1`/`b2`; `vertex_id_1..4` for `aa`/`bb`/`a1`/`b1`, matching
+how they're stored in `modified_edge_[s][0..3]`). Position/index/count
+variables that are *not* vertex ids (segment ids, AB-cycle indices, tour
+positions such as `order_`'s indices, population/generation counters) were
+deliberately left as plain `int`, including the mixed-semantics `ab_cycle_`
+array (`ab_cycle_[c][0]` is a cycle-length count, `ab_cycle_[c][1..]` are
+vertex ids) — see the source for the remaining per-variable judgment calls.
+The nested `eax_ga` namespace also became anonymous in this pass, since
+every template class in it is only ever instantiated from `eax.cpp`'s
+translation unit (via `FUNCTION_WITH_DISTANCES`) — `main.cpp` only calls
+the non-template `eax()` — so there is no ODR risk despite this being a
+header.

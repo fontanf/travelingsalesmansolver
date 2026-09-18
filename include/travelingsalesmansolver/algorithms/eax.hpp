@@ -45,7 +45,7 @@ const Output eax(
  * (https://github.com/Sugia/GA-for-TSP); see 'licenses/eax-ga/NOTICE.md' for
  * the full list of changes made to the original source.
  */
-namespace eax_ga
+namespace
 {
 
 /** A TSP tour, represented as a doubly-linked list over its vertices. */
@@ -58,15 +58,15 @@ public:
     Individual() { }
 
     /** Create an individual for a given number of vertices. */
-    Individual(int number_of_vertices):
+    Individual(VertexId number_of_vertices):
         neighbors(number_of_vertices) { }
 
     /** Checks if two individuals represent the same tour. */
     bool operator==(
             const Individual& individual) const;
 
-    /** 'neighbors[i]' holds the two vertices adjacent to vertex 'i'. */
-    std::vector<std::array<int, 2>> neighbors;
+    /** 'neighbors[vertex_id]' holds the two vertices adjacent to 'vertex_id'. */
+    std::vector<std::array<VertexId, 2>> neighbors;
 
     /** Length of the tour. */
     Distance length = 0;
@@ -140,29 +140,29 @@ public:
     /** Constructor. */
     Evaluator(
             const Distances& distances,
-            int number_of_vertices);
+            VertexId number_of_vertices);
 
     /** Compute and store the length of an individual's tour. */
     void evaluate(
             Individual& individual) const;
 
     /** Return the individual's tour as a 0-indexed list of vertices. */
-    std::vector<int> get_tour(
+    std::vector<VertexId> get_tour(
             const Individual& individual) const;
 
     /** Distance between two vertices. */
     inline Distance distance(
-            int vertex_id_1,
-            int vertex_id_2) const
+            VertexId vertex_id_1,
+            VertexId vertex_id_2) const
     {
         return distances_.distance(vertex_id_1, vertex_id_2);
     }
 
     /** Number of vertices. */
-    int number_of_vertices;
+    VertexId number_of_vertices;
 
-    /** 'near_cities[i][k]' is the k-th nearest vertex to vertex 'i'. */
-    std::vector<std::vector<int>> near_cities;
+    /** 'near_cities[vertex_id][k]' is the k-th nearest vertex to 'vertex_id'. */
+    std::vector<std::vector<VertexId>> near_cities;
 
 private:
 
@@ -180,9 +180,9 @@ private:
 template <typename Distances>
 Evaluator<Distances>::Evaluator(
         const Distances& distances,
-        int number_of_vertices):
+        VertexId number_of_vertices):
     number_of_vertices(number_of_vertices),
-    near_cities(number_of_vertices, std::vector<int>(max_near_cities_ + 1)),
+    near_cities(number_of_vertices, std::vector<VertexId>(max_near_cities_ + 1)),
     distances_(distances)
 {
     compute_near_cities();
@@ -192,22 +192,22 @@ template <typename Distances>
 void Evaluator<Distances>::compute_near_cities()
 {
     std::vector<int> checked(number_of_vertices);
-    for (int city = 0; city < number_of_vertices; ++city) {
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
         std::fill(checked.begin(), checked.end(), 0);
-        checked[city] = 1;
-        near_cities[city][0] = city;
+        checked[vertex_id] = 1;
+        near_cities[vertex_id][0] = vertex_id;
         for (int k = 1; k <= max_near_cities_; ++k) {
-            int closest_city = -1;
+            VertexId closest_vertex_id = -1;
             Distance min_distance = std::numeric_limits<Distance>::max();
-            for (int other_city = 0; other_city < number_of_vertices; ++other_city) {
-                if (checked[other_city] == 0
-                        && distance(city, other_city) <= min_distance) {
-                    closest_city = other_city;
-                    min_distance = distance(city, other_city);
+            for (VertexId other_vertex_id = 0; other_vertex_id < number_of_vertices; ++other_vertex_id) {
+                if (checked[other_vertex_id] == 0
+                        && distance(vertex_id, other_vertex_id) <= min_distance) {
+                    closest_vertex_id = other_vertex_id;
+                    min_distance = distance(vertex_id, other_vertex_id);
                 }
             }
-            near_cities[city][k] = closest_city;
-            checked[closest_city] = 1;
+            near_cities[vertex_id][k] = closest_vertex_id;
+            checked[closest_vertex_id] = 1;
         }
     }
 }
@@ -217,27 +217,27 @@ void Evaluator<Distances>::evaluate(
         Individual& individual) const
 {
     Distance d = 0;
-    for (int i = 0; i < number_of_vertices; ++i)
-        d += distance(i, individual.neighbors[i][0]) + distance(i, individual.neighbors[i][1]);
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id)
+        d += distance(vertex_id, individual.neighbors[vertex_id][0]) + distance(vertex_id, individual.neighbors[vertex_id][1]);
     individual.length = d / 2;
 }
 
 template <typename Distances>
-std::vector<int> Evaluator<Distances>::get_tour(
+std::vector<VertexId> Evaluator<Distances>::get_tour(
         const Individual& individual) const
 {
-    std::vector<int> tour(number_of_vertices);
-    int curr = 0;
-    int st = 0;
-    int pre = -1;
+    std::vector<VertexId> tour(number_of_vertices);
+    VertexId current_vertex_id = 0;
+    VertexId start_vertex_id = 0;
+    VertexId previous_vertex_id = -1;
     for (int count = 0; count < number_of_vertices; ++count) {
-        tour[count] = curr;
-        int next = (individual.neighbors[curr][0] == pre)?
-            individual.neighbors[curr][1]:
-            individual.neighbors[curr][0];
-        pre = curr;
-        curr = next;
-        if (curr == st)
+        tour[count] = current_vertex_id;
+        VertexId next_vertex_id = (individual.neighbors[current_vertex_id][0] == previous_vertex_id)?
+            individual.neighbors[current_vertex_id][1]:
+            individual.neighbors[current_vertex_id][0];
+        previous_vertex_id = current_vertex_id;
+        current_vertex_id = next_vertex_id;
+        if (current_vertex_id == start_vertex_id)
             break;
     }
     return tour;
@@ -257,7 +257,7 @@ public:
     /** Constructor. */
     KOpt(
             Evaluator<Distances>& evaluator,
-            int number_of_vertices);
+            VertexId number_of_vertices);
 
     /** Run the local search on 'individual'. */
     void run(
@@ -280,13 +280,13 @@ private:
     /** Repeatedly apply improving 2-opt moves until none remain. */
     void optimize();
 
-    /** Vertex immediately after 't' in the tour. */
-    int next_city(
-            int t) const;
+    /** Vertex immediately after 'vertex_id' in the tour. */
+    VertexId next_city(
+            VertexId vertex_id) const;
 
-    /** Vertex immediately before 't' in the tour. */
-    int previous_city(
-            int t) const;
+    /** Vertex immediately before 'vertex_id' in the tour. */
+    VertexId previous_city(
+            VertexId vertex_id) const;
 
     /** The orientation opposite to 'orientation' (i.e. '1 - orientation'). */
     static int opposite_orientation(
@@ -304,13 +304,13 @@ private:
             int segment_2);
 
     /** Number of vertices. */
-    int number_of_vertices_;
+    VertexId number_of_vertices_;
 
     /** Evaluator, used to look up distances and nearest-neighbor lists. */
     Evaluator<Distances>& evaluator_;
 
     /** For each vertex, the vertices in whose nearest-neighbor list it appears. */
-    std::vector<std::vector<int>> inverse_near_list_;
+    std::vector<std::vector<VertexId>> inverse_near_list_;
 
     /** Number of segments fixed at the start of the current 'optimize()' call. */
     int fixed_number_of_segments_ = 0;
@@ -324,19 +324,19 @@ private:
     /** Length of the tour, as tracked incrementally by the tree representation. */
     Distance tour_length_ = 0;
 
-    /** 'neighbors_[t]' holds the two vertices adjacent to vertex 't' within its segment ('-1' at a segment end). */
-    std::vector<std::array<int, 2>> neighbors_;
+    /** 'neighbors_[vertex_id]' holds the two vertices adjacent to 'vertex_id' within its segment ('-1' at a segment end). */
+    std::vector<std::array<VertexId, 2>> neighbors_;
 
     /** 'segment_neighbors_[s]' holds the two segments adjacent to segment 's'. */
     std::vector<std::array<int, 2>> segment_neighbors_;
 
     /** 'segment_endpoints_[s]' holds the two endpoint vertices of segment 's'. */
-    std::vector<std::array<int, 2>> segment_endpoints_;
+    std::vector<std::array<VertexId, 2>> segment_endpoints_;
 
     /** The four vertices ('t_[1]'..'t_[4]') involved in the move currently being considered. */
-    std::array<int, 5> t_;
+    std::array<VertexId, 5> t_;
 
-    /** 'city_segment_[t]' is the segment vertex 't' belongs to. */
+    /** 'city_segment_[vertex_id]' is the segment 'vertex_id' belongs to. */
     std::vector<int> city_segment_;
 
     /** Order of the vertices within their segment, used to tell direction/betweenness cheaply. */
@@ -355,10 +355,10 @@ private:
     std::vector<int> active_;
 
     /** Scratch array used to build 'individual_to_tree()'. */
-    std::vector<int> array_;
+    std::vector<VertexId> array_;
 
     /** Scratch array used by 'make_random_solution()'. */
-    std::vector<int> remaining_;
+    std::vector<VertexId> remaining_;
 
     /** Number of nearest neighbors considered per vertex (matches 'Evaluator::max_near_cities_'). */
     static constexpr int max_near_cities_used_ = 50;
@@ -368,7 +368,7 @@ private:
 template <typename Distances>
 KOpt<Distances>::KOpt(
         Evaluator<Distances>& evaluator,
-        int number_of_vertices):
+        VertexId number_of_vertices):
     number_of_vertices_(number_of_vertices),
     evaluator_(evaluator),
     inverse_near_list_(number_of_vertices),
@@ -385,10 +385,10 @@ KOpt<Distances>::KOpt(
     array_(number_of_vertices + 2),
     remaining_(number_of_vertices)
 {
-    for (int city = 0; city < number_of_vertices_; ++city) {
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices_; ++vertex_id) {
         for (int k = 0; k < max_near_cities_used_; ++k) {
-            int near_city = evaluator_.near_cities[city][k];
-            inverse_near_list_[near_city].push_back(city);
+            VertexId near_vertex_id = evaluator_.near_cities[vertex_id][k];
+            inverse_near_list_[near_vertex_id].push_back(vertex_id);
         }
     }
 }
@@ -464,9 +464,9 @@ template <typename Distances>
 void KOpt<Distances>::tree_to_individual(
         Individual& individual) const
 {
-    for (int t = 0; t < number_of_vertices_; ++t) {
-        individual.neighbors[t][0] = previous_city(t);
-        individual.neighbors[t][1] = next_city(t);
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices_; ++vertex_id) {
+        individual.neighbors[vertex_id][0] = previous_city(vertex_id);
+        individual.neighbors[vertex_id][1] = next_city(vertex_id);
     }
     evaluator_.evaluate(individual);
 }
@@ -486,7 +486,7 @@ void KOpt<Distances>::optimize()
     std::fill(active_.begin(), active_.end(), 1);
 BEGIN:
     {
-        int t1_start = random_integer(0, number_of_vertices_ - 1);
+        VertexId t1_start = random_integer(0, number_of_vertices_ - 1);
         t_[1] = t1_start;
         while (true) {
             t_[1] = next_city(t_[1]);
@@ -503,7 +503,7 @@ BEGIN:
                     if (dis2 > 0) {
                         apply_move();
                         for (int a = 1; a <= 4; ++a)
-                            for (int near_vertex : inverse_near_list_[t_[a]])
+                            for (VertexId near_vertex : inverse_near_list_[t_[a]])
                                 active_[near_vertex] = 1;
                         goto BEGIN;
                     }
@@ -522,7 +522,7 @@ BEGIN:
                     if (dis2 > 0) {
                         apply_move();
                         for (int a = 1; a <= 4; ++a)
-                            for (int near_vertex : inverse_near_list_[t_[a]])
+                            for (VertexId near_vertex : inverse_near_list_[t_[a]])
                                 active_[near_vertex] = 1;
                         goto BEGIN;
                     }
@@ -539,39 +539,39 @@ RETURN:
 }
 
 template <typename Distances>
-int KOpt<Distances>::next_city(
-        int t) const
+VertexId KOpt<Distances>::next_city(
+        VertexId vertex_id) const
 {
-    int seg = city_segment_[t];
+    int seg = city_segment_[vertex_id];
     int orientation = segment_orientation_[seg];
-    int t_n = neighbors_[t][orientation];
-    if (t_n == -1) {
+    VertexId next_vertex_id = neighbors_[vertex_id][orientation];
+    if (next_vertex_id == -1) {
         seg = segment_neighbors_[seg][orientation];
         orientation = opposite_orientation(segment_orientation_[seg]);
-        t_n = segment_endpoints_[seg][orientation];
+        next_vertex_id = segment_endpoints_[seg][orientation];
     }
-    return t_n;
+    return next_vertex_id;
 }
 
 template <typename Distances>
-int KOpt<Distances>::previous_city(
-        int t) const
+VertexId KOpt<Distances>::previous_city(
+        VertexId vertex_id) const
 {
-    int seg = city_segment_[t];
+    int seg = city_segment_[vertex_id];
     int orientation = segment_orientation_[seg];
-    int t_p = neighbors_[t][opposite_orientation(orientation)];
-    if (t_p == -1) {
+    VertexId previous_vertex_id = neighbors_[vertex_id][opposite_orientation(orientation)];
+    if (previous_vertex_id == -1) {
         seg = segment_neighbors_[seg][opposite_orientation(orientation)];
         orientation = segment_orientation_[seg];
-        t_p = segment_endpoints_[seg][orientation];
+        previous_vertex_id = segment_endpoints_[seg][orientation];
     }
-    return t_p;
+    return previous_vertex_id;
 }
 
 template <typename Distances>
 void KOpt<Distances>::apply_move()
 {
-    int t1_s, t1_e, t2_s, t2_e;
+    VertexId t1_s, t1_e, t2_s, t2_e;
 
     if (reversed_ == 0) {
         t1_s = t_[1]; t1_e = t_[3]; t2_s = t_[4]; t2_e = t_[2];
@@ -605,7 +605,7 @@ void KOpt<Distances>::apply_move()
             std::swap(orient_t1_s, orient_t2_s);
             std::swap(orient_t1_e, orient_t2_e);
         }
-        int curr = t1_s;
+        VertexId curr = t1_s;
         int ord = city_order_[t1_e];
         while (true) {
             std::swap(neighbors_[curr][0], neighbors_[curr][1]);
@@ -664,7 +664,7 @@ void KOpt<Distances>::apply_move()
             return;
         }
         if (flag_t2e_t1s == 0 && flag_t2s_t1e == 1) {
-            int curr = t1_e;
+            VertexId curr = t1_e;
             int ord = city_order_[t1_s];
             while (true) {
                 std::swap(neighbors_[curr][0], neighbors_[curr][1]);
@@ -684,7 +684,7 @@ void KOpt<Distances>::apply_move()
             return;
         }
         if (flag_t2e_t1s == 1 && flag_t2s_t1e == 0) {
-            int curr = t1_s;
+            VertexId curr = t1_s;
             int ord = city_order_[t1_e];
             while (true) {
                 std::swap(neighbors_[curr][0], neighbors_[curr][1]);
@@ -821,7 +821,8 @@ void KOpt<Distances>::merge_segments(
         int segment_1,
         int segment_2)
 {
-    int t_s = 0, t_e = 0, direction = 0, ord = 0, increment = 0;
+    VertexId t_s = 0, t_e = 0;
+    int direction = 0, ord = 0, increment = 0;
 
     if (segment_neighbors_[segment_1][segment_orientation_[segment_1]] == segment_2) {
         neighbors_[segment_endpoints_[segment_1][segment_orientation_[segment_1]]][segment_orientation_[segment_1]] =
@@ -858,19 +859,19 @@ void KOpt<Distances>::merge_segments(
 
         increment = (segment_orientation_[segment_1] == 1) ? -1 : 1;
     }
-    int curr = t_s;
+    VertexId curr = t_s;
     ord = ord + increment;
     while (true) {
         city_segment_[curr] = segment_1;
         city_order_[curr] = ord;
 
-        int next = neighbors_[curr][direction];
+        VertexId next_vertex_id = neighbors_[curr][direction];
         if (segment_orientation_[segment_1] != segment_orientation_[segment_2])
             std::swap(neighbors_[curr][0], neighbors_[curr][1]);
 
         if (curr == t_e)
             break;
-        curr = next;
+        curr = next_vertex_id;
         ord += increment;
     }
     segment_size_[segment_1] += segment_size_[segment_2];
@@ -881,9 +882,9 @@ template <typename Distances>
 void KOpt<Distances>::make_random_solution(
         Individual& individual)
 {
-    for (int j = 0; j < number_of_vertices_; ++j)
-        remaining_[j] = j;
-    std::vector<int> gene(number_of_vertices_);
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices_; ++vertex_id)
+        remaining_[vertex_id] = vertex_id;
+    std::vector<VertexId> gene(number_of_vertices_);
     for (int i = 0; i < number_of_vertices_; ++i) {
         int r = random_integer(0, number_of_vertices_ - i - 1);
         gene[i] = remaining_[r];
@@ -915,7 +916,7 @@ public:
     /** Constructor. */
     Cross(
             Evaluator<Distances>& evaluator,
-            int number_of_vertices,
+            VertexId number_of_vertices,
             int population_size);
 
     /** Generate 'number_of_kids' children from 'child'/'parent2' and set 'child' to the best one found. */
@@ -1009,16 +1010,16 @@ private:
     int population_size_;
 
     /** Number of vertices. */
-    int number_of_vertices_;
+    VertexId number_of_vertices_;
     int random_pick_;
     int start_new_trace_;
     int cycle_complete_;
     int traversal_type_;
     int number_of_unbranched_;
     int number_of_branching_;
-    int trace_start_;
-    int current_city_;
-    int previous_city_;
+    VertexId trace_start_;
+    VertexId current_city_;
+    VertexId previous_city_;
     int start_appearance_count_;
     int evaluation_type_;
     int eset_strategy_;
@@ -1026,16 +1027,16 @@ private:
     int position_current_;
     int max_number_of_ab_cycles_;
 
-    std::vector<int> unbranched_;
-    std::vector<int> branching_;
+    std::vector<VertexId> unbranched_;
+    std::vector<VertexId> branching_;
     std::vector<int> unbranched_index_;
     std::vector<int> branching_index_;
     std::vector<int> first_visit_position_;
-    std::vector<int> route_;
+    std::vector<VertexId> route_;
     std::vector<int> permutation_;
-    std::vector<int> c_;
+    std::vector<VertexId> c_;
 
-    std::vector<std::vector<int>> near_data_;
+    std::vector<std::vector<VertexId>> near_data_;
     std::vector<std::vector<int>> ab_cycle_;
 
     // speeds up start
@@ -1050,7 +1051,7 @@ private:
     int number_of_applied_cycles_;
     int number_of_best_applied_cycles_;
 
-    std::vector<int> order_;
+    std::vector<VertexId> order_;
     std::vector<int> inverse_order_;
     std::vector<int> segment_unit_;
     std::vector<int> segment_position_list_;
@@ -1058,7 +1059,7 @@ private:
     std::vector<int> position_segment_;
     std::vector<int> number_of_elements_in_unit_;
     std::vector<int> center_unit_;
-    std::vector<int> list_of_center_unit_;
+    std::vector<VertexId> list_of_center_unit_;
     std::vector<int> segment_for_center_;
     std::vector<Distance> gain_ab_;
     std::vector<int> applied_cycle_;
@@ -1066,8 +1067,8 @@ private:
 
     std::vector<std::vector<int>> segment_;
     std::vector<std::vector<int>> link_b_position_;
-    std::vector<std::vector<int>> modified_edge_;
-    std::vector<std::vector<int>> best_modified_edge_;
+    std::vector<std::vector<VertexId>> modified_edge_;
+    std::vector<std::vector<VertexId>> best_modified_edge_;
     // speeds up end
 
     // block2
@@ -1095,7 +1096,7 @@ private:
 template <typename Distances>
 Cross<Distances>::Cross(
         Evaluator<Distances>& evaluator,
-        int number_of_vertices,
+        VertexId number_of_vertices,
         int population_size):
     evaluator_(evaluator),
     population_size_(population_size)
@@ -1105,7 +1106,7 @@ Cross<Distances>::Cross(
 
     near_data_.clear();
     for (int i = 0; i < number_of_vertices_; i++) {
-        std::vector<int> row(5);
+        std::vector<VertexId> row(5);
         near_data_.push_back(row);
     }
 
@@ -1165,13 +1166,13 @@ Cross<Distances>::Cross(
 
     modified_edge_.clear();
     for (int i = 0; i < number_of_vertices_; i++) {
-        std::vector<int> row(4);
+        std::vector<VertexId> row(4);
         modified_edge_.push_back(row);
     }
 
     best_modified_edge_.clear();
     for (int i = 0; i < number_of_vertices_; i++) {
-        std::vector<int> row(4);
+        std::vector<VertexId> row(4);
         best_modified_edge_.push_back(row);
     }
 
@@ -1206,7 +1207,8 @@ void Cross<Distances>::set_parents(
         const Individual& parent1,
         const Individual& parent2,
         int flags[10],
-        int number_of_kids) {
+        int number_of_kids)
+{
     this->set_ab_cycle(parent1, parent2, flags, number_of_kids);
 
     // NOTE: this local deliberately shadows the member 'distance_ab_' under
@@ -1217,23 +1219,22 @@ void Cross<Distances>::set_parents(
     // updated by this method, so 'run()' always sees a stale value from a
     // previous call (or 0, on the very first call). See NOTICE.md.
     int distance_ab_local = 0;
-    int start_vertex = 0;
-    int curr = -1;
-    int next = start_vertex;
-    int pre;
+    VertexId start_vertex_id = 0;
+    VertexId current_vertex_id = -1;
+    VertexId next_vertex_id = start_vertex_id;
+    VertexId previous_vertex_id;
     for (int i = 0; i < number_of_vertices_; ++i) {
-        pre = curr;
-        curr = next;
-        if (parent1.neighbors[curr][0] != pre) {
-            next = parent1.neighbors[curr][0];
+        previous_vertex_id = current_vertex_id;
+        current_vertex_id = next_vertex_id;
+        if (parent1.neighbors[current_vertex_id][0] != previous_vertex_id) {
+            next_vertex_id = parent1.neighbors[current_vertex_id][0];
         } else {
-            next = parent1.neighbors[curr][1];
+            next_vertex_id = parent1.neighbors[current_vertex_id][1];
         }
-        if (parent2.neighbors[curr][0] != next && parent2.neighbors[curr][1] != next) {
+        if (parent2.neighbors[current_vertex_id][0] != next_vertex_id && parent2.neighbors[current_vertex_id][1] != next_vertex_id)
             ++distance_ab_local;
-        }
-        order_[i] = curr;
-        inverse_order_[curr] = i;
+        order_[i] = current_vertex_id;
+        inverse_order_[current_vertex_id] = i;
     }
 
     if (flags[1] == 2) {
@@ -1250,7 +1251,8 @@ void Cross<Distances>::run(
         int number_of_kids,
         int flag_p,
         int flags[10],
-        std::vector<std::vector<int>>& edge_frequency) {
+        std::vector<std::vector<int>>& edge_frequency)
+{
     int number_of_candidates;
     int jnum, center_ab;
     Distance gain;
@@ -1261,14 +1263,17 @@ void Cross<Distances>::run(
     evaluation_type_ = flags[0]; // 1:Greedy, 2:---, 3:Distance, 4:Entropy
     eset_strategy_ = flags[1]; // 1:Single-AB, 2:Block2
 
-    if (number_of_kids <= number_of_ab_cycles_) number_of_candidates = number_of_kids;
-    else number_of_candidates = number_of_ab_cycles_;
+    if (number_of_kids <= number_of_ab_cycles_) {
+        number_of_candidates = number_of_kids;
+    } else {
+        number_of_candidates = number_of_ab_cycles_;
+    }
 
-    if (eset_strategy_ == 1) // Single-AB
-    random_permutation(permutation_, number_of_ab_cycles_, number_of_ab_cycles_);
-
-    else if (eset_strategy_ == 2) { // Block2
-        for (int k = 0; k < number_of_ab_cycles_; ++k) number_of_elements_in_ab_cycle_[k] = ab_cycle_[k][0];
+    if (eset_strategy_ == 1) { // Single-AB
+        random_permutation(permutation_, number_of_ab_cycles_, number_of_ab_cycles_);
+    } else if (eset_strategy_ == 2) { // Block2
+        for (int k = 0; k < number_of_ab_cycles_; ++k)
+            number_of_elements_in_ab_cycle_[k] = ab_cycle_[k][0];
         sort_indices_descending(number_of_elements_in_ab_cycle_, number_of_ab_cycles_, permutation_, number_of_ab_cycles_);
     }
     number_of_generated_children = 0;
@@ -1280,18 +1285,20 @@ void Cross<Distances>::run(
         if (eset_strategy_ == 1) { //Single-AB
             jnum = permutation_[j];
             ab_cycle_in_eset_[number_of_ab_cycles_in_eset_++] = jnum;
-        }
-        else if (eset_strategy_ == 2) { //Block2
+        } else if (eset_strategy_ == 2) { //Block2
             jnum = permutation_[j];
             center_ab = jnum;
             for (int s = 0; s < number_of_ab_cycles_; ++s) {
-                if (s == center_ab) ab_cycle_in_eset_[number_of_ab_cycles_in_eset_++] = s;
-                else {
-                    if (weight_rr_[center_ab][s] > 0 && ab_cycle_[s][0] < ab_cycle_[center_ab][0])
-                    if (rand() %2 == 0) ab_cycle_in_eset_[number_of_ab_cycles_in_eset_++] = s;
+                if (s == center_ab) {
+                    ab_cycle_in_eset_[number_of_ab_cycles_in_eset_++] = s;
+                } else {
+                    if (weight_rr_[center_ab][s] > 0 && ab_cycle_[s][0] < ab_cycle_[center_ab][0]) {
+                        if (rand() % 2 == 0)
+                            ab_cycle_in_eset_[number_of_ab_cycles_in_eset_++] = s;
+                    }
                 }
             }
-        this->search_eset(center_ab);
+            this->search_eset(center_ab);
         }
         number_of_segment_positions_ = 0;
         gain = 0;
@@ -1312,11 +1319,16 @@ void Cross<Distances>::run(
 
         ++number_of_generated_children;
 
-        if (evaluation_type_ == 1) loss = 1.0; // Greedy
-        else if (evaluation_type_ == 3) loss = this->calc_adaptive_loss(edge_frequency); // Distance preservation
-        else if (evaluation_type_ == 4) loss = this->calc_entropy_loss(edge_frequency); // Entropy preservation
+        if (evaluation_type_ == 1) { // Greedy
+            loss = 1.0;
+        } else if (evaluation_type_ == 3) { // Distance preservation
+            loss = this->calc_adaptive_loss(edge_frequency);
+        } else if (evaluation_type_ == 4) { // Entropy preservation
+            loss = this->calc_entropy_loss(edge_frequency);
+        }
 
-        if (loss <= 0.0) loss = 0.00000001;
+        if (loss <= 0.0)
+            loss = 0.00000001;
 
         point = (double)gain / loss;
         child.length = child.length - gain;
@@ -1327,7 +1339,8 @@ void Cross<Distances>::run(
             improved = true;
 
             number_of_best_applied_cycles_ = number_of_applied_cycles_;
-            for (int s = 0; s < number_of_best_applied_cycles_; ++s) best_applied_cycle_[s] = applied_cycle_[s];
+            for (int s = 0; s < number_of_best_applied_cycles_; ++s)
+                best_applied_cycle_[s] = applied_cycle_[s];
 
             number_of_best_modified_edges_ = number_of_modified_edges_;
             for (int s = 0; s < number_of_best_modified_edges_; ++s) {
@@ -1353,36 +1366,39 @@ void Cross<Distances>::set_ab_cycle(
         const Individual& parent1,
         const Individual& parent2,
         int flags[10],
-        int number_of_kids) {
-    number_of_branching_ = 0; number_of_unbranched_ = 0;
-    for (int j = 0; j < number_of_vertices_ ; ++j) {
-        near_data_[j][1] = parent1.neighbors[j][0];
-        near_data_[j][3] = parent1.neighbors[j][1];
-        near_data_[j][0] = 2;
+        int number_of_kids)
+{
+    number_of_branching_ = 0;
+    number_of_unbranched_ = 0;
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices_; ++vertex_id) {
+        near_data_[vertex_id][1] = parent1.neighbors[vertex_id][0];
+        near_data_[vertex_id][3] = parent1.neighbors[vertex_id][1];
+        near_data_[vertex_id][0] = 2;
 
-        unbranched_[number_of_unbranched_] = j;
+        unbranched_[number_of_unbranched_] = vertex_id;
         number_of_unbranched_++;
 
-        near_data_[j][2] = parent2.neighbors[j][0];
-        near_data_[j][4] = parent2.neighbors[j][1];
+        near_data_[vertex_id][2] = parent2.neighbors[vertex_id][0];
+        near_data_[vertex_id][4] = parent2.neighbors[vertex_id][1];
     }
-    for (int j = 0; j < number_of_vertices_; ++j) {
-        first_visit_position_[j] = -1;
-        unbranched_index_[unbranched_[j]] = j;
+    for (int i = 0; i < number_of_vertices_; ++i) {
+        first_visit_position_[i] = -1;
+        unbranched_index_[unbranched_[i]] = i;
     }
     number_of_ab_cycles_ = 0;
     start_new_trace_ = 1;
     while (number_of_unbranched_ != 0) {
         if (start_new_trace_ == 1) {
             position_current_ = 0;
-            random_pick_ = rand()%number_of_unbranched_;
+            random_pick_ = rand() % number_of_unbranched_;
             trace_start_ = unbranched_[random_pick_];
             first_visit_position_[trace_start_] = position_current_;
             route_[position_current_] = trace_start_;
             current_city_ = trace_start_;
             traversal_type_ = 2;
+        } else if (start_new_trace_ == 0) {
+            current_city_ = route_[position_current_];
         }
-        else if (start_new_trace_ == 0) current_city_ = route_[position_current_];
 
         cycle_complete_ = 0;
         while (cycle_complete_ == 0) {
@@ -1391,12 +1407,13 @@ void Cross<Distances>::set_ab_cycle(
             switch (traversal_type_) {
             case 1:
                 current_city_ = near_data_[previous_city_][position_current_ % 2 + 1];
-            break;
+                break;
             case 2:
-                random_pick_ = rand()%2;
+                random_pick_ = rand() % 2;
                 current_city_ = near_data_[previous_city_][position_current_ % 2 + 1 + 2 * random_pick_];
-                if (random_pick_ == 0) std::swap(near_data_[previous_city_][position_current_ % 2 + 1], near_data_[previous_city_][position_current_ % 2 + 3]);
-            break;
+                if (random_pick_ == 0)
+                    std::swap(near_data_[previous_city_][position_current_ % 2 + 1], near_data_[previous_city_][position_current_ % 2 + 3]);
+                break;
             case 3:
                 current_city_ = near_data_[previous_city_][position_current_ % 2 + 3];
             }
@@ -1404,73 +1421,78 @@ void Cross<Distances>::set_ab_cycle(
             if (near_data_[current_city_][0] == 2) {
                 if (current_city_ == trace_start_) {
                     if (first_visit_position_[trace_start_] == 0) {
-                    if ((position_current_ - first_visit_position_[trace_start_])%2 == 0) {
-                        if (near_data_[trace_start_][position_current_ % 2 + 1] == previous_city_) std::swap(near_data_[current_city_][position_current_ % 2 + 1], near_data_[current_city_][position_current_ % 2 + 3]);
+                        if ((position_current_ - first_visit_position_[trace_start_]) % 2 == 0) {
+                            if (near_data_[trace_start_][position_current_ % 2 + 1] == previous_city_)
+                                std::swap(near_data_[current_city_][position_current_ % 2 + 1], near_data_[current_city_][position_current_ % 2 + 3]);
 
-                        start_appearance_count_ = 1;
+                            start_appearance_count_ = 1;
+                            this->form_ab_cycle();
+                            if (flags[1] == 1 && number_of_ab_cycles_ == number_of_kids)
+                                goto RETURN;
+                            if (number_of_ab_cycles_ == max_number_of_ab_cycles_)
+                                goto RETURN;
+
+                            start_new_trace_ = 0;
+                            cycle_complete_ = 1;
+                            traversal_type_ = 1;
+                        } else {
+                            std::swap(near_data_[current_city_][position_current_ % 2 + 1], near_data_[current_city_][position_current_ % 2 + 3]);
+                            traversal_type_ = 2;
+                        }
+                        first_visit_position_[trace_start_] = position_current_;
+                    } else {
+                        start_appearance_count_ = 2;
                         this->form_ab_cycle();
-                        if (flags[1] == 1 && number_of_ab_cycles_ == number_of_kids) goto RETURN;
-                        if (number_of_ab_cycles_ == max_number_of_ab_cycles_) goto RETURN;
+                        if (flags[1] == 1 && number_of_ab_cycles_ == number_of_kids)
+                            goto RETURN;
+                        if (number_of_ab_cycles_ == max_number_of_ab_cycles_)
+                            goto RETURN;
 
-                        start_new_trace_ = 0;
+                        start_new_trace_ = 1;
                         cycle_complete_ = 1;
-                        traversal_type_ = 1;
                     }
-                    else {
-                        std::swap(near_data_[current_city_][position_current_ % 2 + 1], near_data_[current_city_][position_current_ % 2 + 3]);
-                        traversal_type_ = 2;
-                    }
-                    first_visit_position_[trace_start_] = position_current_;
-                    }
-                    else {
-                    start_appearance_count_ = 2;
-                    this->form_ab_cycle();
-                    if (flags[1] == 1 && number_of_ab_cycles_ == number_of_kids) goto RETURN;
-                    if (number_of_ab_cycles_ == max_number_of_ab_cycles_) goto RETURN;
-
-                    start_new_trace_ = 1;
-                    cycle_complete_ = 1;
-                    }
-                }
-                else if (first_visit_position_[current_city_] == -1) {
+                } else if (first_visit_position_[current_city_] == -1) {
                     first_visit_position_[current_city_] = position_current_;
-                    if (near_data_[current_city_][position_current_ % 2 + 1] == previous_city_) std::swap(near_data_[current_city_][position_current_ % 2 + 1], near_data_[current_city_][position_current_ % 2 + 3]);
+                    if (near_data_[current_city_][position_current_ % 2 + 1] == previous_city_)
+                        std::swap(near_data_[current_city_][position_current_ % 2 + 1], near_data_[current_city_][position_current_ % 2 + 3]);
                     traversal_type_ = 2;
-                }
-                else if (first_visit_position_[current_city_]>0) {
+                } else if (first_visit_position_[current_city_] > 0) {
                     std::swap(near_data_[current_city_][position_current_ % 2 + 1], near_data_[current_city_][position_current_ % 2 + 3]);
-                    if ((position_current_ - first_visit_position_[current_city_])%2 == 0) {
+                    if ((position_current_ - first_visit_position_[current_city_]) % 2 == 0) {
                         start_appearance_count_ = 1;
                         this->form_ab_cycle();
-                        if (flags[1] == 1 && number_of_ab_cycles_ == number_of_kids) goto RETURN;
-                        if (number_of_ab_cycles_ == max_number_of_ab_cycles_) goto RETURN;
+                        if (flags[1] == 1 && number_of_ab_cycles_ == number_of_kids)
+                            goto RETURN;
+                        if (number_of_ab_cycles_ == max_number_of_ab_cycles_)
+                            goto RETURN;
 
                         start_new_trace_ = 0;
                         cycle_complete_ = 1;
                         traversal_type_ = 1;
-                    }
-                    else {
-                        std::swap(near_data_[current_city_][(position_current_ + 1)%2 + 1], near_data_[current_city_][(position_current_ + 1)%2 + 3]);
+                    } else {
+                        std::swap(near_data_[current_city_][(position_current_ + 1) % 2 + 1], near_data_[current_city_][(position_current_ + 1) % 2 + 3]);
                         traversal_type_ = 3;
                     }
                 }
-            }
-            else if (near_data_[current_city_][0] == 1) {
+            } else if (near_data_[current_city_][0] == 1) {
                 if (current_city_ == trace_start_) {
                     start_appearance_count_ = 1;
                     this->form_ab_cycle();
-                    if (flags[1] == 1 && number_of_ab_cycles_ == number_of_kids) goto RETURN;
-                    if (number_of_ab_cycles_ == max_number_of_ab_cycles_) goto RETURN;
+                    if (flags[1] == 1 && number_of_ab_cycles_ == number_of_kids)
+                        goto RETURN;
+                    if (number_of_ab_cycles_ == max_number_of_ab_cycles_)
+                        goto RETURN;
                     start_new_trace_ = 1;
                     cycle_complete_ = 1;
+                } else {
+                    traversal_type_ = 1;
                 }
-                else traversal_type_ = 1;
             }
         }
     }
     while (number_of_branching_ != 0) {
         position_current_ = 0;
-        random_pick_ = rand()%number_of_branching_;
+        random_pick_ = rand() % number_of_branching_;
         trace_start_ = branching_[random_pick_];
         route_[position_current_] = trace_start_;
         current_city_ = trace_start_;
@@ -1484,8 +1506,10 @@ void Cross<Distances>::set_ab_cycle(
             if (current_city_ == trace_start_) {
                 start_appearance_count_ = 1;
                 this->form_ab_cycle();
-                if (flags[1] == 1 && number_of_ab_cycles_ == number_of_kids) goto RETURN;
-                if (number_of_ab_cycles_ == max_number_of_ab_cycles_) goto RETURN;
+                if (flags[1] == 1 && number_of_ab_cycles_ == number_of_kids)
+                    goto RETURN;
+                if (number_of_ab_cycles_ == max_number_of_ab_cycles_)
+                    goto RETURN;
 
                 cycle_complete_ = 1;
             }
@@ -1499,10 +1523,11 @@ RETURN:
 }
 
 template <typename Distances>
-void Cross<Distances>::form_ab_cycle() {
-    int cycle_start;
-    int visiting_city;
-    int stock;
+void Cross<Distances>::form_ab_cycle()
+{
+    VertexId cycle_start;
+    VertexId visiting_city;
+    VertexId stock;
     int start_count;
     int edge_type;
     int cycle_length;
@@ -1572,10 +1597,12 @@ template <typename Distances>
 void Cross<Distances>::change_sol(
         Individual& child,
         int ab_number,
-        int type) {
+        int type)
+{
     int j;
-    int cycle_length, r1, r2, b1, b2;
-    int po_r1, po_r2, po_b1, po_b2;
+    int cycle_length;
+    VertexId red_vertex_id_1, red_vertex_id_2, blue_vertex_id_1, blue_vertex_id_2;
+    int red_position_1, red_position_2, blue_position_1, blue_position_2;
 
     cycle_length = ab_cycle_[ab_number][0];
     c_[0] = ab_cycle_[ab_number][0];
@@ -1589,35 +1616,51 @@ void Cross<Distances>::change_sol(
     }
 
     for (j = 0; j < cycle_length / 2; ++j) {
-        r1 = c_[2 + 2 * j]; r2 = c_[3 + 2 * j];
-        b1 = c_[1 + 2 * j]; b2 = c_[4 + 2 * j];
+        red_vertex_id_1 = c_[2 + 2 * j];
+        red_vertex_id_2 = c_[3 + 2 * j];
+        blue_vertex_id_1 = c_[1 + 2 * j];
+        blue_vertex_id_2 = c_[4 + 2 * j];
 
-        if (child.neighbors[r1][0] == r2) child.neighbors[r1][0] = b1;
-        else child.neighbors[r1][1] = b1;
-        if (child.neighbors[r2][0] == r1) child.neighbors[r2][0] = b2;
-        else child.neighbors[r2][1] = b2;
+        if (child.neighbors[red_vertex_id_1][0] == red_vertex_id_2) {
+            child.neighbors[red_vertex_id_1][0] = blue_vertex_id_1;
+        } else {
+            child.neighbors[red_vertex_id_1][1] = blue_vertex_id_1;
+        }
+        if (child.neighbors[red_vertex_id_2][0] == red_vertex_id_1) {
+            child.neighbors[red_vertex_id_2][0] = blue_vertex_id_2;
+        } else {
+            child.neighbors[red_vertex_id_2][1] = blue_vertex_id_2;
+        }
 
-        po_r1 = inverse_order_[r1];
-        po_r2 = inverse_order_[r2];
-        po_b1 = inverse_order_[b1];
-        po_b2 = inverse_order_[b2];
+        red_position_1 = inverse_order_[red_vertex_id_1];
+        red_position_2 = inverse_order_[red_vertex_id_2];
+        blue_position_1 = inverse_order_[blue_vertex_id_1];
+        blue_position_2 = inverse_order_[blue_vertex_id_2];
 
-        if (po_r1 == 0 && po_r2 == number_of_vertices_ - 1) segment_position_list_[number_of_segment_positions_++] = po_r1;
-        else if (po_r1 == number_of_vertices_ - 1 && po_r2 == 0) segment_position_list_[number_of_segment_positions_++] = po_r2;
-        else if (po_r1 < po_r2) segment_position_list_[number_of_segment_positions_++] = po_r2;
-        else if (po_r2 < po_r1) segment_position_list_[number_of_segment_positions_++] = po_r1;
+        if (red_position_1 == 0 && red_position_2 == number_of_vertices_ - 1) {
+            segment_position_list_[number_of_segment_positions_++] = red_position_1;
+        } else if (red_position_1 == number_of_vertices_ - 1 && red_position_2 == 0) {
+            segment_position_list_[number_of_segment_positions_++] = red_position_2;
+        } else if (red_position_1 < red_position_2) {
+            segment_position_list_[number_of_segment_positions_++] = red_position_2;
+        } else if (red_position_2 < red_position_1) {
+            segment_position_list_[number_of_segment_positions_++] = red_position_1;
+        }
 
-        link_b_position_[po_r1][1] = link_b_position_[po_r1][0];
-        link_b_position_[po_r2][1] = link_b_position_[po_r2][0];
-        link_b_position_[po_r1][0] = po_b1;
-        link_b_position_[po_r2][0] = po_b2;
+        link_b_position_[red_position_1][1] = link_b_position_[red_position_1][0];
+        link_b_position_[red_position_2][1] = link_b_position_[red_position_2][0];
+        link_b_position_[red_position_1][0] = blue_position_1;
+        link_b_position_[red_position_2][0] = blue_position_2;
     }
 }
 
 template <typename Distances>
-void Cross<Distances>::make_complete_sol(Individual& child) {
-    int j, j1, j2;
-    int unit_start, pre, curr, next, a, b, c, d, aa, bb, a1, b1;
+void Cross<Distances>::make_complete_sol(Individual& child)
+{
+    int j1, j2;
+    VertexId unit_start, previous_vertex_id, current_vertex_id, next_vertex_id;
+    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
+    VertexId best_vertex_id_1, best_vertex_id_2, best_vertex_id_3, best_vertex_id_4;
     int min_unit_city;
     int center_unit_index, selected_unit_index;
     Distance diff, max_diff;
@@ -1632,7 +1675,6 @@ void Cross<Distances>::make_complete_sol(Individual& child) {
                 min_unit_city = number_of_elements_in_unit_[u];
             }
 
-
         unit_start = -1;
         number_of_segments_for_center_ = 0;
         for (int s = 0; s < number_of_segments_; ++s)
@@ -1641,47 +1683,58 @@ void Cross<Distances>::make_complete_sol(Individual& child) {
                 unit_start = order_[posi];
                 segment_for_center_[number_of_segments_for_center_++] = s;
             }
-        curr = -1;
-        next = unit_start;
+        current_vertex_id = -1;
+        next_vertex_id = unit_start;
         number_of_elements_in_center_unit_ = 0;
-        while (1) {
-            pre = curr;
-            curr = next;
-            center_unit_[curr] = 1;
-            list_of_center_unit_[number_of_elements_in_center_unit_] = curr;
+        while (true) {
+            previous_vertex_id = current_vertex_id;
+            current_vertex_id = next_vertex_id;
+            center_unit_[current_vertex_id] = 1;
+            list_of_center_unit_[number_of_elements_in_center_unit_] = current_vertex_id;
             ++number_of_elements_in_center_unit_;
-            if (child.neighbors[curr][0] != pre) next = child.neighbors[curr][0];
-            else next = child.neighbors[curr][1];
-            if (next == unit_start) break;
+            if (child.neighbors[current_vertex_id][0] != previous_vertex_id) {
+                next_vertex_id = child.neighbors[current_vertex_id][0];
+            } else {
+                next_vertex_id = child.neighbors[current_vertex_id][1];
+            }
+            if (next_vertex_id == unit_start)
+                break;
         }
         list_of_center_unit_[number_of_elements_in_center_unit_] = list_of_center_unit_[0];
         list_of_center_unit_[number_of_elements_in_center_unit_ + 1] = list_of_center_unit_[1];
 
         max_diff = std::numeric_limits<Distance>::min();
-        a1 = -1; b1 = -1;
+        best_vertex_id_3 = -1;
+        best_vertex_id_4 = -1;
         near_search_limit = 10;   // N_near
         // near_search_limit <= eva->fNearNumMax (kopt.cpp)
 
     RESTART:
         for (int s = 1; s <= number_of_elements_in_center_unit_; ++s) {
-            a = list_of_center_unit_[s];
+            vertex_id_1 = list_of_center_unit_[s];
 
             for (near_num = 1; near_num <= near_search_limit; ++near_num) {
-                c = evaluator_.near_cities[a][near_num];
-                if (center_unit_[c] == 0) {
+                vertex_id_3 = evaluator_.near_cities[vertex_id_1][near_num];
+                if (center_unit_[vertex_id_3] == 0) {
                     for (j1 = 0; j1 < 2; ++j1) {
-                        b = list_of_center_unit_[s - 1 + 2 * j1];
+                        vertex_id_2 = list_of_center_unit_[s - 1 + 2 * j1];
                         for (j2 = 0; j2 < 2; ++j2) {
-                            d = child.neighbors[c][j2];
-                            diff = evaluator_.distance(a, b) + evaluator_.distance(c, d) - evaluator_.distance(a, c) - evaluator_.distance(b, d);
+                            vertex_id_4 = child.neighbors[vertex_id_3][j2];
+                            diff = evaluator_.distance(vertex_id_1, vertex_id_2) + evaluator_.distance(vertex_id_3, vertex_id_4) - evaluator_.distance(vertex_id_1, vertex_id_3) - evaluator_.distance(vertex_id_2, vertex_id_4);
                             if (diff > max_diff) {
-                                aa = a; bb = b; a1 = c; b1 = d;
+                                best_vertex_id_1 = vertex_id_1;
+                                best_vertex_id_2 = vertex_id_2;
+                                best_vertex_id_3 = vertex_id_3;
+                                best_vertex_id_4 = vertex_id_4;
                                 max_diff = diff;
                             }
-                            diff = evaluator_.distance(a, b) + evaluator_.distance(d, c) -
-                                evaluator_.distance(a, d) - evaluator_.distance(b, c);
+                            diff = evaluator_.distance(vertex_id_1, vertex_id_2) + evaluator_.distance(vertex_id_4, vertex_id_3) -
+                                evaluator_.distance(vertex_id_1, vertex_id_4) - evaluator_.distance(vertex_id_2, vertex_id_3);
                             if (diff > max_diff) {
-                                aa = a; bb = b; a1 = d; b1 = c;
+                                best_vertex_id_1 = vertex_id_1;
+                                best_vertex_id_2 = vertex_id_2;
+                                best_vertex_id_3 = vertex_id_4;
+                                best_vertex_id_4 = vertex_id_3;
                                 max_diff = diff;
                             }
                         }
@@ -1690,71 +1743,85 @@ void Cross<Distances>::make_complete_sol(Individual& child) {
             }
         }
 
-        if (a1 == -1 && near_search_limit == 10) {
+        if (best_vertex_id_3 == -1 && near_search_limit == 10) {
             near_search_limit = 50;
             goto RESTART;
-        }
-        else if (a1 == -1 && near_search_limit == 50) {
+        } else if (best_vertex_id_3 == -1 && near_search_limit == 50) {
             int random_center_index = rand() % (number_of_elements_in_center_unit_ - 1);
-            a = list_of_center_unit_[random_center_index];
-            b = list_of_center_unit_[random_center_index + 1];
-            for (j = 0; j < number_of_vertices_; ++j) {
-                if (center_unit_[j] == 0) {
-                    aa = a; bb = b;
-                    a1 = j;
-                    b1 = child.neighbors[j][0];
+            vertex_id_1 = list_of_center_unit_[random_center_index];
+            vertex_id_2 = list_of_center_unit_[random_center_index + 1];
+            for (VertexId vertex_id = 0; vertex_id < number_of_vertices_; ++vertex_id) {
+                if (center_unit_[vertex_id] == 0) {
+                    best_vertex_id_1 = vertex_id_1;
+                    best_vertex_id_2 = vertex_id_2;
+                    best_vertex_id_3 = vertex_id;
+                    best_vertex_id_4 = child.neighbors[vertex_id][0];
                     break;
                 }
             }
-            max_diff = evaluator_.distance(aa, bb) + evaluator_.distance(a1, b1) - evaluator_.distance(a, a1) - evaluator_.distance(b, b1);
+            max_diff = evaluator_.distance(best_vertex_id_1, best_vertex_id_2) + evaluator_.distance(best_vertex_id_3, best_vertex_id_4) - evaluator_.distance(vertex_id_1, best_vertex_id_3) - evaluator_.distance(vertex_id_2, best_vertex_id_4);
         }
 
-        if (child.neighbors[aa][0] == bb) child.neighbors[aa][0] = a1;
-        else child.neighbors[aa][1] = a1;
-        if (child.neighbors[bb][0] == aa) child.neighbors[bb][0] = b1;
-        else child.neighbors[bb][1] = b1;
-        if (child.neighbors[a1][0] == b1) child.neighbors[a1][0] = aa;
-        else child.neighbors[a1][1] = aa;
-        if (child.neighbors[b1][0] == a1) child.neighbors[b1][0] = bb;
-        else child.neighbors[b1][1] = bb;
+        if (child.neighbors[best_vertex_id_1][0] == best_vertex_id_2) {
+            child.neighbors[best_vertex_id_1][0] = best_vertex_id_3;
+        } else {
+            child.neighbors[best_vertex_id_1][1] = best_vertex_id_3;
+        }
+        if (child.neighbors[best_vertex_id_2][0] == best_vertex_id_1) {
+            child.neighbors[best_vertex_id_2][0] = best_vertex_id_4;
+        } else {
+            child.neighbors[best_vertex_id_2][1] = best_vertex_id_4;
+        }
+        if (child.neighbors[best_vertex_id_3][0] == best_vertex_id_4) {
+            child.neighbors[best_vertex_id_3][0] = best_vertex_id_1;
+        } else {
+            child.neighbors[best_vertex_id_3][1] = best_vertex_id_1;
+        }
+        if (child.neighbors[best_vertex_id_4][0] == best_vertex_id_3) {
+            child.neighbors[best_vertex_id_4][0] = best_vertex_id_2;
+        } else {
+            child.neighbors[best_vertex_id_4][1] = best_vertex_id_2;
+        }
 
-        modified_edge_[number_of_modified_edges_][0] = aa;
-        modified_edge_[number_of_modified_edges_][1] = bb;
-        modified_edge_[number_of_modified_edges_][2] = a1;
-        modified_edge_[number_of_modified_edges_][3] = b1;
+        modified_edge_[number_of_modified_edges_][0] = best_vertex_id_1;
+        modified_edge_[number_of_modified_edges_][1] = best_vertex_id_2;
+        modified_edge_[number_of_modified_edges_][2] = best_vertex_id_3;
+        modified_edge_[number_of_modified_edges_][3] = best_vertex_id_4;
         ++number_of_modified_edges_;
 
         modification_gain_ += max_diff;
 
-        int position_a1 = inverse_order_[a1];
+        int best_position_3 = inverse_order_[best_vertex_id_3];
         selected_unit_index = -1;
         for (int s = 0; s < number_of_segments_; ++s)
-            if (segment_[s][0] <= position_a1 && position_a1 <= segment_[s][1]) {
+            if (segment_[s][0] <= best_position_3 && best_position_3 <= segment_[s][1]) {
                 selected_unit_index = segment_unit_[s];
                 break;
             }
 
-
         for (int s = 0; s < number_of_segments_; ++s)
-            if (segment_unit_[s] == selected_unit_index) segment_unit_[s] = center_unit_index;
+            if (segment_unit_[s] == selected_unit_index)
+                segment_unit_[s] = center_unit_index;
 
         number_of_elements_in_unit_[center_unit_index] += number_of_elements_in_unit_[selected_unit_index];
 
         for (int s = 0; s < number_of_segments_; ++s)
-            if (segment_unit_[s] == number_of_units_ - 1) segment_unit_[s] = selected_unit_index;
+            if (segment_unit_[s] == number_of_units_ - 1)
+                segment_unit_[s] = selected_unit_index;
 
         number_of_elements_in_unit_[selected_unit_index] = number_of_elements_in_unit_[number_of_units_ - 1];
         --number_of_units_;
 
         for (int s = 0; s < number_of_elements_in_center_unit_; ++s) {
-            c = list_of_center_unit_[s];
-            center_unit_[c] = 0;
+            VertexId vertex_id = list_of_center_unit_[s];
+            center_unit_[vertex_id] = 0;
         }
     }
 }
 
 template <typename Distances>
-void Cross<Distances>::make_unit() {
+void Cross<Distances>::make_unit()
+{
     int flag = 1;
     for (int s = 0; s < number_of_segment_positions_; ++s) {
         if (segment_position_list_[s] == 0) {
@@ -1787,7 +1854,8 @@ void Cross<Distances>::make_unit() {
         position_segment_[segment_[s][1]] = s;
     }
 
-    for (int s = 0; s < number_of_segments_; ++s) segment_unit_[s] = -1;
+    for (int s = 0; s < number_of_segments_; ++s)
+        segment_unit_[s] = -1;
     number_of_units_ = 0;
 
     int start_position, position1, position2, next_position, previous_position;
@@ -1803,7 +1871,8 @@ void Cross<Distances>::make_unit() {
                 break;
             }
         }
-        if (flag == 0) break;
+        if (flag == 0)
+            break;
 
         while (1) {
             segment_number = position_segment_[position1];
@@ -1812,7 +1881,8 @@ void Cross<Distances>::make_unit() {
             position2 = link_a_position_[position1];
             next_position = link_b_position_[position2][0];
             if (position1 == position2)
-                if (next_position == previous_position) next_position = link_b_position_[position2][1];
+                if (next_position == previous_position)
+                    next_position = link_b_position_[position2][1];
 
             if (next_position == start_position) {
                 ++number_of_units_;
@@ -1824,7 +1894,8 @@ void Cross<Distances>::make_unit() {
         }
     }
 
-    for (int s = 0; s < number_of_units_; ++s) number_of_elements_in_unit_[s] = 0;
+    for (int s = 0; s < number_of_units_; ++s)
+        number_of_elements_in_unit_[s] = 0;
 
     int unit_number = -1;
     int merged_segment_count = -1;
@@ -1835,37 +1906,47 @@ void Cross<Distances>::make_unit() {
             segment_[merged_segment_count][1] = segment_[s][1];
             unit_number = segment_unit_[s];
             segment_unit_[merged_segment_count] = unit_number;
-            number_of_elements_in_unit_[unit_number] += 
-            segment_[s][1] - segment_[s][0] + 1;
-        }
-        else {
+            number_of_elements_in_unit_[unit_number] += segment_[s][1] - segment_[s][0] + 1;
+        } else {
             segment_[merged_segment_count][1] = segment_[s][1];
-            number_of_elements_in_unit_[unit_number] += 
-            segment_[s][1] - segment_[s][0] + 1;
+            number_of_elements_in_unit_[unit_number] += segment_[s][1] - segment_[s][0] + 1;
         }
     }
     number_of_segments_ = merged_segment_count + 1;
 }
 
 template <typename Distances>
-void Cross<Distances>::back_to_pa1(Individual& child) {
-    int aa, bb, a1, b1;
+void Cross<Distances>::back_to_pa1(Individual& child)
+{
+    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
     int jnum;
 
     for (int s = number_of_modified_edges_ - 1; s >= 0; --s) {
-        aa = modified_edge_[s][0];
-        a1 = modified_edge_[s][1];
-        bb = modified_edge_[s][2];
-        b1 = modified_edge_[s][3];
+        vertex_id_1 = modified_edge_[s][0];
+        vertex_id_3 = modified_edge_[s][1];
+        vertex_id_2 = modified_edge_[s][2];
+        vertex_id_4 = modified_edge_[s][3];
 
-        if (child.neighbors[aa][0] == bb) child.neighbors[aa][0] = a1;
-        else child.neighbors[aa][1] = a1;
-        if (child.neighbors[b1][0] == a1) child.neighbors[b1][0] = bb;
-        else child.neighbors[b1][1] = bb;
-        if (child.neighbors[bb][0] == aa) child.neighbors[bb][0] = b1;
-        else child.neighbors[bb][1] = b1;
-        if (child.neighbors[a1][0] == b1) child.neighbors[a1][0] = aa;
-        else child.neighbors[a1][1] = aa;
+        if (child.neighbors[vertex_id_1][0] == vertex_id_2) {
+            child.neighbors[vertex_id_1][0] = vertex_id_3;
+        } else {
+            child.neighbors[vertex_id_1][1] = vertex_id_3;
+        }
+        if (child.neighbors[vertex_id_4][0] == vertex_id_3) {
+            child.neighbors[vertex_id_4][0] = vertex_id_2;
+        } else {
+            child.neighbors[vertex_id_4][1] = vertex_id_2;
+        }
+        if (child.neighbors[vertex_id_2][0] == vertex_id_1) {
+            child.neighbors[vertex_id_2][0] = vertex_id_4;
+        } else {
+            child.neighbors[vertex_id_2][1] = vertex_id_4;
+        }
+        if (child.neighbors[vertex_id_3][0] == vertex_id_4) {
+            child.neighbors[vertex_id_3][0] = vertex_id_1;
+        } else {
+            child.neighbors[vertex_id_3][1] = vertex_id_1;
+        }
     }
 
     for (int s = 0; s < number_of_applied_cycles_; ++s) {
@@ -1875,8 +1956,9 @@ void Cross<Distances>::back_to_pa1(Individual& child) {
 }
 
 template <typename Distances>
-void Cross<Distances>::go_to_best(Individual& child) {
-    int aa, bb, a1, b1;
+void Cross<Distances>::go_to_best(Individual& child)
+{
+    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
     int jnum;
 
     for (int s = 0; s < number_of_best_applied_cycles_; ++s) {
@@ -1885,28 +1967,41 @@ void Cross<Distances>::go_to_best(Individual& child) {
     }
 
     for (int s = 0; s < number_of_best_modified_edges_; ++s) {
-        aa = best_modified_edge_[s][0];
-        bb = best_modified_edge_[s][1];
-        a1 = best_modified_edge_[s][2];
-        b1 = best_modified_edge_[s][3];
+        vertex_id_1 = best_modified_edge_[s][0];
+        vertex_id_2 = best_modified_edge_[s][1];
+        vertex_id_3 = best_modified_edge_[s][2];
+        vertex_id_4 = best_modified_edge_[s][3];
 
-        if (child.neighbors[aa][0] == bb) child.neighbors[aa][0] = a1;
-        else child.neighbors[aa][1] = a1;
-        if (child.neighbors[bb][0] == aa) child.neighbors[bb][0] = b1;
-        else child.neighbors[bb][1] = b1;
-        if (child.neighbors[a1][0] == b1) child.neighbors[a1][0] = aa;
-        else child.neighbors[a1][1] = aa;
-        if (child.neighbors[b1][0] == a1) child.neighbors[b1][0] = bb;
-        else child.neighbors[b1][1] = bb;
+        if (child.neighbors[vertex_id_1][0] == vertex_id_2) {
+            child.neighbors[vertex_id_1][0] = vertex_id_3;
+        } else {
+            child.neighbors[vertex_id_1][1] = vertex_id_3;
+        }
+        if (child.neighbors[vertex_id_2][0] == vertex_id_1) {
+            child.neighbors[vertex_id_2][0] = vertex_id_4;
+        } else {
+            child.neighbors[vertex_id_2][1] = vertex_id_4;
+        }
+        if (child.neighbors[vertex_id_3][0] == vertex_id_4) {
+            child.neighbors[vertex_id_3][0] = vertex_id_1;
+        } else {
+            child.neighbors[vertex_id_3][1] = vertex_id_1;
+        }
+        if (child.neighbors[vertex_id_4][0] == vertex_id_3) {
+            child.neighbors[vertex_id_4][0] = vertex_id_2;
+        } else {
+            child.neighbors[vertex_id_4][1] = vertex_id_2;
+        }
     }
 }
 
 template <typename Distances>
 void Cross<Distances>::increment_edge_freq(
-        std::vector<std::vector<int>>& edge_frequency) {
+        std::vector<std::vector<int>>& edge_frequency)
+{
     int j, jnum, cycle_length;
-    int r1, r2, b1, b2;
-    int aa, bb, a1;
+    VertexId red_vertex_id_1, red_vertex_id_2, blue_vertex_id_1, blue_vertex_id_2;
+    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
 
     for (int s = 0; s < number_of_best_applied_cycles_; ++s) {
         jnum = best_applied_cycle_[s];
@@ -1918,38 +2013,41 @@ void Cross<Distances>::increment_edge_freq(
             c_[j] = ab_cycle_[jnum][j];
 
         for (j = 0; j < cycle_length / 2; ++j) {
-            r1 = c_[2 + 2 * j]; r2 = c_[3 + 2 * j];
-            b1 = c_[1 + 2 * j]; b2 = c_[4 + 2 * j];
+            red_vertex_id_1 = c_[2 + 2 * j];
+            red_vertex_id_2 = c_[3 + 2 * j];
+            blue_vertex_id_1 = c_[1 + 2 * j];
+            blue_vertex_id_2 = c_[4 + 2 * j];
 
-            ++edge_frequency[r1][b1];
-            --edge_frequency[r1][r2];
-            --edge_frequency[r2][r1];
-            ++edge_frequency[r2][b2];
+            ++edge_frequency[red_vertex_id_1][blue_vertex_id_1];
+            --edge_frequency[red_vertex_id_1][red_vertex_id_2];
+            --edge_frequency[red_vertex_id_2][red_vertex_id_1];
+            ++edge_frequency[red_vertex_id_2][blue_vertex_id_2];
         }
     }
     for (int s = 0; s < number_of_best_modified_edges_; ++s) {
-        aa = best_modified_edge_[s][0];
-        bb = best_modified_edge_[s][1];
-        a1 = best_modified_edge_[s][2];
-        b1 = best_modified_edge_[s][3];
+        vertex_id_1 = best_modified_edge_[s][0];
+        vertex_id_2 = best_modified_edge_[s][1];
+        vertex_id_3 = best_modified_edge_[s][2];
+        vertex_id_4 = best_modified_edge_[s][3];
 
-        --edge_frequency[aa][bb];
-        --edge_frequency[a1][b1];
-        ++edge_frequency[aa][a1];
-        ++edge_frequency[bb][b1];
-        --edge_frequency[bb][aa];
-        --edge_frequency[b1][a1];
-        ++edge_frequency[a1][aa];
-        ++edge_frequency[b1][bb];
+        --edge_frequency[vertex_id_1][vertex_id_2];
+        --edge_frequency[vertex_id_3][vertex_id_4];
+        ++edge_frequency[vertex_id_1][vertex_id_3];
+        ++edge_frequency[vertex_id_2][vertex_id_4];
+        --edge_frequency[vertex_id_2][vertex_id_1];
+        --edge_frequency[vertex_id_4][vertex_id_3];
+        ++edge_frequency[vertex_id_3][vertex_id_1];
+        ++edge_frequency[vertex_id_4][vertex_id_2];
     }
 }
 
 template <typename Distances>
 int Cross<Distances>::calc_adaptive_loss(
-        std::vector<std::vector<int>>& edge_frequency) {
+        std::vector<std::vector<int>>& edge_frequency)
+{
     int j, jnum, cycle_length;
-    int r1, r2, b1, b2;
-    int aa, bb, a1;
+    VertexId red_vertex_id_1, red_vertex_id_2, blue_vertex_id_1, blue_vertex_id_2;
+    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
     double loss;
 
     loss = 0;
@@ -1959,92 +2057,97 @@ int Cross<Distances>::calc_adaptive_loss(
         cycle_length = ab_cycle_[jnum][0];
         c_[0] = ab_cycle_[jnum][0];
 
-        for (j = 1; j <= cycle_length + 3; ++j) c_[j] = ab_cycle_[jnum][j];
+        for (j = 1; j <= cycle_length + 3; ++j)
+            c_[j] = ab_cycle_[jnum][j];
 
         for (j = 0; j < cycle_length / 2; ++j) {
-            r1 = c_[2 + 2 * j]; r2 = c_[3 + 2 * j];
-            b1 = c_[1 + 2 * j]; b2 = c_[4 + 2 * j];
+            red_vertex_id_1 = c_[2 + 2 * j];
+            red_vertex_id_2 = c_[3 + 2 * j];
+            blue_vertex_id_1 = c_[1 + 2 * j];
+            blue_vertex_id_2 = c_[4 + 2 * j];
 
+            loss -= (edge_frequency[red_vertex_id_1][red_vertex_id_2] - 1);
+            loss -= (edge_frequency[red_vertex_id_2][red_vertex_id_1] - 1);
+            loss += edge_frequency[red_vertex_id_2][blue_vertex_id_2];
+            loss += edge_frequency[blue_vertex_id_2][red_vertex_id_2];
 
-            loss -= (edge_frequency[r1][r2] - 1);
-            loss -= (edge_frequency[r2][r1] - 1);
-            loss += edge_frequency[r2][b2];
-            loss += edge_frequency[b2][r2];
-
-
-            --edge_frequency[r1][r2];
-            --edge_frequency[r2][r1];
-            ++edge_frequency[r2][b2];
-            ++edge_frequency[b2][r2];
+            --edge_frequency[red_vertex_id_1][red_vertex_id_2];
+            --edge_frequency[red_vertex_id_2][red_vertex_id_1];
+            ++edge_frequency[red_vertex_id_2][blue_vertex_id_2];
+            ++edge_frequency[blue_vertex_id_2][red_vertex_id_2];
         }
     }
     for (int s = 0; s < number_of_modified_edges_; ++s) {
-        aa = modified_edge_[s][0];
-        bb = modified_edge_[s][1];
-        a1 = modified_edge_[s][2];
-        b1 = modified_edge_[s][3];
+        vertex_id_1 = modified_edge_[s][0];
+        vertex_id_2 = modified_edge_[s][1];
+        vertex_id_3 = modified_edge_[s][2];
+        vertex_id_4 = modified_edge_[s][3];
 
-        loss -= (edge_frequency[aa][bb] - 1);
-        loss -= (edge_frequency[bb][aa] - 1);
-        loss -= (edge_frequency[a1][b1] - 1);
-        loss -= (edge_frequency[b1][a1] - 1);
+        loss -= (edge_frequency[vertex_id_1][vertex_id_2] - 1);
+        loss -= (edge_frequency[vertex_id_2][vertex_id_1] - 1);
+        loss -= (edge_frequency[vertex_id_3][vertex_id_4] - 1);
+        loss -= (edge_frequency[vertex_id_4][vertex_id_3] - 1);
 
-        loss += edge_frequency[aa][a1];
-        loss += edge_frequency[a1][aa];
-        loss += edge_frequency[bb][b1];
-        loss += edge_frequency[b1][bb];
+        loss += edge_frequency[vertex_id_1][vertex_id_3];
+        loss += edge_frequency[vertex_id_3][vertex_id_1];
+        loss += edge_frequency[vertex_id_2][vertex_id_4];
+        loss += edge_frequency[vertex_id_4][vertex_id_2];
 
-        --edge_frequency[aa][bb];
-        --edge_frequency[bb][aa];
-        --edge_frequency[a1][b1];
-        --edge_frequency[b1][a1];
+        --edge_frequency[vertex_id_1][vertex_id_2];
+        --edge_frequency[vertex_id_2][vertex_id_1];
+        --edge_frequency[vertex_id_3][vertex_id_4];
+        --edge_frequency[vertex_id_4][vertex_id_3];
 
-        ++edge_frequency[aa][a1];
-        ++edge_frequency[a1][aa];
-        ++edge_frequency[bb][b1];
-        ++edge_frequency[b1][bb];
+        ++edge_frequency[vertex_id_1][vertex_id_3];
+        ++edge_frequency[vertex_id_3][vertex_id_1];
+        ++edge_frequency[vertex_id_2][vertex_id_4];
+        ++edge_frequency[vertex_id_4][vertex_id_2];
     }
     for (int s = 0; s < number_of_applied_cycles_; ++s) {
         jnum = applied_cycle_[s];
         cycle_length = ab_cycle_[jnum][0];
         c_[0] = ab_cycle_[jnum][0];
-        for (j = 1; j <= cycle_length + 3; ++j) c_[j] = ab_cycle_[jnum][j];
+        for (j = 1; j <= cycle_length + 3; ++j)
+            c_[j] = ab_cycle_[jnum][j];
 
         for (j = 0; j < cycle_length / 2; ++j) {
-            r1 = c_[2 + 2 * j]; r2 = c_[3 + 2 * j];
-            b1 = c_[1 + 2 * j]; b2 = c_[4 + 2 * j];
+            red_vertex_id_1 = c_[2 + 2 * j];
+            red_vertex_id_2 = c_[3 + 2 * j];
+            blue_vertex_id_1 = c_[1 + 2 * j];
+            blue_vertex_id_2 = c_[4 + 2 * j];
 
-            ++edge_frequency[r1][r2];
-            ++edge_frequency[r2][r1];
-            --edge_frequency[r2][b2];
-            --edge_frequency[b2][r2];
+            ++edge_frequency[red_vertex_id_1][red_vertex_id_2];
+            ++edge_frequency[red_vertex_id_2][red_vertex_id_1];
+            --edge_frequency[red_vertex_id_2][blue_vertex_id_2];
+            --edge_frequency[blue_vertex_id_2][red_vertex_id_2];
         }
     }
     for (int s = 0; s < number_of_modified_edges_; ++s) {
-        aa = modified_edge_[s][0];
-        bb = modified_edge_[s][1];
-        a1 = modified_edge_[s][2];
-        b1 = modified_edge_[s][3];
+        vertex_id_1 = modified_edge_[s][0];
+        vertex_id_2 = modified_edge_[s][1];
+        vertex_id_3 = modified_edge_[s][2];
+        vertex_id_4 = modified_edge_[s][3];
 
-        ++edge_frequency[aa][bb];
-        ++edge_frequency[bb][aa];
-        ++edge_frequency[a1][b1];
-        ++edge_frequency[b1][a1];
+        ++edge_frequency[vertex_id_1][vertex_id_2];
+        ++edge_frequency[vertex_id_2][vertex_id_1];
+        ++edge_frequency[vertex_id_3][vertex_id_4];
+        ++edge_frequency[vertex_id_4][vertex_id_3];
 
-        --edge_frequency[aa][a1];
-        --edge_frequency[a1][aa];
-        --edge_frequency[bb][b1];
-        --edge_frequency[b1][bb];
+        --edge_frequency[vertex_id_1][vertex_id_3];
+        --edge_frequency[vertex_id_3][vertex_id_1];
+        --edge_frequency[vertex_id_2][vertex_id_4];
+        --edge_frequency[vertex_id_4][vertex_id_2];
     }
     return int(loss / 2);
 }
 
 template <typename Distances>
 double Cross<Distances>::calc_entropy_loss(
-        std::vector<std::vector<int>>& edge_frequency) {
+        std::vector<std::vector<int>>& edge_frequency)
+{
     int j, jnum, cycle_length;
-    int r1, r2, b1, b2;
-    int aa, bb, a1;
+    VertexId red_vertex_id_1, red_vertex_id_2, blue_vertex_id_1, blue_vertex_id_2;
+    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
     double loss;
     double h1, h2;
 
@@ -2054,65 +2157,70 @@ double Cross<Distances>::calc_entropy_loss(
         cycle_length = ab_cycle_[jnum][0];
         c_[0] = ab_cycle_[jnum][0];
 
-        for (j = 1; j <= cycle_length + 3; ++j) c_[j] = ab_cycle_[jnum][j];
+        for (j = 1; j <= cycle_length + 3; ++j)
+            c_[j] = ab_cycle_[jnum][j];
 
         for (j = 0; j < cycle_length / 2; ++j) {
-            r1 = c_[2 + 2 * j]; r2 = c_[3 + 2 * j];
-            b1 = c_[1 + 2 * j]; b2 = c_[4 + 2 * j];
+            red_vertex_id_1 = c_[2 + 2 * j];
+            red_vertex_id_2 = c_[3 + 2 * j];
+            blue_vertex_id_1 = c_[1 + 2 * j];
+            blue_vertex_id_2 = c_[4 + 2 * j];
 
-          h1 = (double)(edge_frequency[r1][r2] - 1)/(double)population_size_;
-          h2 = (double)(edge_frequency[r1][r2])/(double)population_size_;
-          if (edge_frequency[r1][r2] - 1 != 0) loss -= h1 * log(h1);
-          loss += h2 * log(h2);
-          --edge_frequency[r1][r2];
-          --edge_frequency[r2][r1];
+            h1 = (double)(edge_frequency[red_vertex_id_1][red_vertex_id_2] - 1) / (double)population_size_;
+            h2 = (double)(edge_frequency[red_vertex_id_1][red_vertex_id_2]) / (double)population_size_;
+            if (edge_frequency[red_vertex_id_1][red_vertex_id_2] - 1 != 0)
+                loss -= h1 * log(h1);
+            loss += h2 * log(h2);
+            --edge_frequency[red_vertex_id_1][red_vertex_id_2];
+            --edge_frequency[red_vertex_id_2][red_vertex_id_1];
 
-          h1 = (double)(edge_frequency[r2][b2] + 1)/(double)population_size_;
-          h2 = (double)(edge_frequency[r2][b2])/(double)population_size_;
-          loss -= h1 * log(h1);
-          if (edge_frequency[r2][b2] != 0) loss += h2 * log(h2);
-          ++edge_frequency[r2][b2];
-          ++edge_frequency[b2][r2];
+            h1 = (double)(edge_frequency[red_vertex_id_2][blue_vertex_id_2] + 1) / (double)population_size_;
+            h2 = (double)(edge_frequency[red_vertex_id_2][blue_vertex_id_2]) / (double)population_size_;
+            loss -= h1 * log(h1);
+            if (edge_frequency[red_vertex_id_2][blue_vertex_id_2] != 0)
+                loss += h2 * log(h2);
+            ++edge_frequency[red_vertex_id_2][blue_vertex_id_2];
+            ++edge_frequency[blue_vertex_id_2][red_vertex_id_2];
         }
     }
 
     for (int s = 0; s < number_of_modified_edges_; ++s) {
-        aa = modified_edge_[s][0];
-        bb = modified_edge_[s][1];
-        a1 = modified_edge_[s][2];
-        b1 = modified_edge_[s][3];
+        vertex_id_1 = modified_edge_[s][0];
+        vertex_id_2 = modified_edge_[s][1];
+        vertex_id_3 = modified_edge_[s][2];
+        vertex_id_4 = modified_edge_[s][3];
 
-        h1 = (double)(edge_frequency[aa][bb] - 1)/(double)population_size_;
-        h2 = (double)(edge_frequency[aa][bb])/(double)population_size_;
-        if (edge_frequency[aa][bb] - 1 != 0)
-          loss -= h1 * log(h1);
+        h1 = (double)(edge_frequency[vertex_id_1][vertex_id_2] - 1) / (double)population_size_;
+        h2 = (double)(edge_frequency[vertex_id_1][vertex_id_2]) / (double)population_size_;
+        if (edge_frequency[vertex_id_1][vertex_id_2] - 1 != 0)
+            loss -= h1 * log(h1);
         loss += h2 * log(h2);
-        --edge_frequency[aa][bb];
-        --edge_frequency[bb][aa];
+        --edge_frequency[vertex_id_1][vertex_id_2];
+        --edge_frequency[vertex_id_2][vertex_id_1];
 
-        h1 = (double)(edge_frequency[a1][b1] - 1)/(double)population_size_;
-        h2 = (double)(edge_frequency[a1][b1])/(double)population_size_;
-        if (edge_frequency[a1][b1] - 1 != 0)
-          loss -= h1 * log(h1);
+        h1 = (double)(edge_frequency[vertex_id_3][vertex_id_4] - 1) / (double)population_size_;
+        h2 = (double)(edge_frequency[vertex_id_3][vertex_id_4]) / (double)population_size_;
+        if (edge_frequency[vertex_id_3][vertex_id_4] - 1 != 0)
+            loss -= h1 * log(h1);
         loss += h2 * log(h2);
-        --edge_frequency[a1][b1];
-        --edge_frequency[b1][a1];
+        --edge_frequency[vertex_id_3][vertex_id_4];
+        --edge_frequency[vertex_id_4][vertex_id_3];
 
-        h1 = (double)(edge_frequency[aa][a1] + 1)/(double)population_size_;
-        h2 = (double)(edge_frequency[aa][a1])/(double)population_size_;
+        h1 = (double)(edge_frequency[vertex_id_1][vertex_id_3] + 1) / (double)population_size_;
+        h2 = (double)(edge_frequency[vertex_id_1][vertex_id_3]) / (double)population_size_;
         loss -= h1 * log(h1);
-        if (edge_frequency[aa][a1] != 0)
-          loss += h2 * log(h2);
-        ++edge_frequency[aa][a1];
-        ++edge_frequency[a1][aa];
+        if (edge_frequency[vertex_id_1][vertex_id_3] != 0)
+            loss += h2 * log(h2);
+        ++edge_frequency[vertex_id_1][vertex_id_3];
+        ++edge_frequency[vertex_id_3][vertex_id_1];
 
-        h1 = (double)(edge_frequency[bb][b1] + 1)/(double)population_size_;
-        h2 = (double)(edge_frequency[bb][b1])/(double)population_size_;
+        h1 = (double)(edge_frequency[vertex_id_2][vertex_id_4] + 1) / (double)population_size_;
+        h2 = (double)(edge_frequency[vertex_id_2][vertex_id_4]) / (double)population_size_;
         loss -= h1 * log(h1);
-        if (edge_frequency[bb][b1] != 0)
-          loss += h2 * log(h2);
-        ++edge_frequency[bb][b1];
-        ++edge_frequency[b1][bb];
+        if (edge_frequency[vertex_id_2][vertex_id_4] != 0)
+            loss += h2 * log(h2);
+        ++edge_frequency[vertex_id_2][vertex_id_4];
+        ++edge_frequency[vertex_id_4][vertex_id_2];
     }
     loss = -loss;
 
@@ -2123,93 +2231,106 @@ double Cross<Distances>::calc_entropy_loss(
         cycle_length = ab_cycle_[jnum][0];
         c_[0] = ab_cycle_[jnum][0];
 
-        for (j = 1; j <= cycle_length + 3; ++j) c_[j] = ab_cycle_[jnum][j];
+        for (j = 1; j <= cycle_length + 3; ++j)
+            c_[j] = ab_cycle_[jnum][j];
 
         for (j = 0; j < cycle_length / 2; ++j) {
-          r1 = c_[2 + 2 * j]; r2 = c_[3 + 2 * j];
-          b1 = c_[1 + 2 * j]; b2 = c_[4 + 2 * j];
+            red_vertex_id_1 = c_[2 + 2 * j];
+            red_vertex_id_2 = c_[3 + 2 * j];
+            blue_vertex_id_1 = c_[1 + 2 * j];
+            blue_vertex_id_2 = c_[4 + 2 * j];
 
-          ++edge_frequency[r1][r2];
-          ++edge_frequency[r2][r1];
-          --edge_frequency[r2][b2];
-          --edge_frequency[b2][r2];
+            ++edge_frequency[red_vertex_id_1][red_vertex_id_2];
+            ++edge_frequency[red_vertex_id_2][red_vertex_id_1];
+            --edge_frequency[red_vertex_id_2][blue_vertex_id_2];
+            --edge_frequency[blue_vertex_id_2][red_vertex_id_2];
         }
     }
     for (int s = 0; s < number_of_modified_edges_; ++s) {
-        aa = modified_edge_[s][0];
-        bb = modified_edge_[s][1];
-        a1 = modified_edge_[s][2];
-        b1 = modified_edge_[s][3];
+        vertex_id_1 = modified_edge_[s][0];
+        vertex_id_2 = modified_edge_[s][1];
+        vertex_id_3 = modified_edge_[s][2];
+        vertex_id_4 = modified_edge_[s][3];
 
-        ++edge_frequency[aa][bb];
-        ++edge_frequency[bb][aa];
-        ++edge_frequency[a1][b1];
-        ++edge_frequency[b1][a1];
+        ++edge_frequency[vertex_id_1][vertex_id_2];
+        ++edge_frequency[vertex_id_2][vertex_id_1];
+        ++edge_frequency[vertex_id_3][vertex_id_4];
+        ++edge_frequency[vertex_id_4][vertex_id_3];
 
-        --edge_frequency[aa][a1];
-        --edge_frequency[a1][aa];
-        --edge_frequency[bb][b1];
-        --edge_frequency[b1][bb];
+        --edge_frequency[vertex_id_1][vertex_id_3];
+        --edge_frequency[vertex_id_3][vertex_id_1];
+        --edge_frequency[vertex_id_2][vertex_id_4];
+        --edge_frequency[vertex_id_4][vertex_id_2];
     }
-  return loss;
+    return loss;
 }
 
 template <typename Distances>
 void Cross<Distances>::set_weight(
         const Individual& parent1,
-        const Individual& parent2) {
+        const Individual& parent2)
+{
     int cycle_length;
-    int r1, r2, v1, v2, v_p;
+    VertexId red_vertex_id_1, red_vertex_id_2, current_vertex_id, next_vertex_id, previous_vertex_id;
     int ab_number;
 
-    for (int i = 0; i < number_of_vertices_; ++i) {
-        in_effect_node_[i][0] = -1;
-        in_effect_node_[i][1] = -1;
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices_; ++vertex_id) {
+        in_effect_node_[vertex_id][0] = -1;
+        in_effect_node_[vertex_id][1] = -1;
     }
 
     // Step 1:
     for (int s = 0; s < number_of_ab_cycles_; ++s) {
         cycle_length = ab_cycle_[s][0];
         for (int j = 0; j < cycle_length / 2; ++j) {
-            r1 = ab_cycle_[s][2 * j + 2]; // red edge
-            r2 = ab_cycle_[s][2 * j + 3];
+            red_vertex_id_1 = ab_cycle_[s][2 * j + 2]; // red edge
+            red_vertex_id_2 = ab_cycle_[s][2 * j + 3];
 
-            if (in_effect_node_[r1][0] == -1) in_effect_node_[r1][0] = s;
-            else if (in_effect_node_[r1][1] == -1) in_effect_node_[r1][1] = s;
+            if (in_effect_node_[red_vertex_id_1][0] == -1) {
+                in_effect_node_[red_vertex_id_1][0] = s;
+            } else if (in_effect_node_[red_vertex_id_1][1] == -1) {
+                in_effect_node_[red_vertex_id_1][1] = s;
+            }
 
-
-            if (in_effect_node_[r2][0] == -1) in_effect_node_[r2][0] = s;
-            else if (in_effect_node_[r2][1] == -1) in_effect_node_[r2][1] = s;
-
+            if (in_effect_node_[red_vertex_id_2][0] == -1) {
+                in_effect_node_[red_vertex_id_2][0] = s;
+            } else if (in_effect_node_[red_vertex_id_2][1] == -1) {
+                in_effect_node_[red_vertex_id_2][1] = s;
+            }
         }
     }
 
     // Step 2:
-    for (int i = 0; i < number_of_vertices_; ++i) {
-        if (in_effect_node_[i][0] != -1 && in_effect_node_[i][1] == -1) {
-            ab_number = in_effect_node_[i][0];
-            v1 = i;
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices_; ++vertex_id) {
+        if (in_effect_node_[vertex_id][0] != -1 && in_effect_node_[vertex_id][1] == -1) {
+            ab_number = in_effect_node_[vertex_id][0];
+            current_vertex_id = vertex_id;
 
-            if (parent1.neighbors[v1][0] != parent2.neighbors[v1][0] && parent1.neighbors[v1][0] != parent2.neighbors[v1][1])
-                v_p = parent1.neighbors[v1][0];
-            else if (parent1.neighbors[v1][1] != parent2.neighbors[v1][0] && parent1.neighbors[v1][1] != parent2.neighbors[v1][1])
-                v_p = parent1.neighbors[v1][1];
+            if (parent1.neighbors[current_vertex_id][0] != parent2.neighbors[current_vertex_id][0] && parent1.neighbors[current_vertex_id][0] != parent2.neighbors[current_vertex_id][1]) {
+                previous_vertex_id = parent1.neighbors[current_vertex_id][0];
+            } else if (parent1.neighbors[current_vertex_id][1] != parent2.neighbors[current_vertex_id][0] && parent1.neighbors[current_vertex_id][1] != parent2.neighbors[current_vertex_id][1]) {
+                previous_vertex_id = parent1.neighbors[current_vertex_id][1];
+            }
 
+            while (true) {
+                in_effect_node_[current_vertex_id][1] = ab_number;
 
-            while (1) {
-                in_effect_node_[v1][1] = ab_number;
+                if (parent1.neighbors[current_vertex_id][0] != previous_vertex_id) {
+                    next_vertex_id = parent1.neighbors[current_vertex_id][0];
+                } else if (parent1.neighbors[current_vertex_id][1] != previous_vertex_id) {
+                    next_vertex_id = parent1.neighbors[current_vertex_id][1];
+                }
 
-                if (parent1.neighbors[v1][0] != v_p) v2 = parent1.neighbors[v1][0];
-                else if (parent1.neighbors[v1][1] != v_p) v2 = parent1.neighbors[v1][1];
+                if (in_effect_node_[next_vertex_id][0] == -1) {
+                    in_effect_node_[next_vertex_id][0] = ab_number;
+                } else if (in_effect_node_[next_vertex_id][1] == -1) {
+                    in_effect_node_[next_vertex_id][1] = ab_number;
+                }
 
-
-                if (in_effect_node_[v2][0] == -1) in_effect_node_[v2][0] = ab_number;
-                else if (in_effect_node_[v2][1] == -1) in_effect_node_[v2][1] = ab_number;
-
-
-                if (in_effect_node_[v2][1] != -1) break;
-                v_p = v1;
-                v1 = v2;
+                if (in_effect_node_[next_vertex_id][1] != -1)
+                    break;
+                previous_vertex_id = current_vertex_id;
+                current_vertex_id = next_vertex_id;
             }
         }
     }
@@ -2218,43 +2339,49 @@ void Cross<Distances>::set_weight(
 
     for (int s1 = 0; s1 < number_of_ab_cycles_; ++s1) {
         weight_c_[s1] = 0;
-        for (int s2 = 0; s2 < number_of_ab_cycles_; ++s2) weight_rr_[s1][s2] = 0;
+        for (int s2 = 0; s2 < number_of_ab_cycles_; ++s2)
+            weight_rr_[s1][s2] = 0;
     }
 
-    for (int i = 0; i < number_of_vertices_; ++i) {
-
-        if (in_effect_node_[i][0] != -1 && in_effect_node_[i][1] != -1) {
-            ++weight_rr_[in_effect_node_[i][0]][in_effect_node_[i][1]];
-            ++weight_rr_[in_effect_node_[i][1]][in_effect_node_[i][0]];
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices_; ++vertex_id) {
+        if (in_effect_node_[vertex_id][0] != -1 && in_effect_node_[vertex_id][1] != -1) {
+            ++weight_rr_[in_effect_node_[vertex_id][0]][in_effect_node_[vertex_id][1]];
+            ++weight_rr_[in_effect_node_[vertex_id][1]][in_effect_node_[vertex_id][0]];
         }
-        if (in_effect_node_[i][0] != in_effect_node_[i][1]) {
-            ++weight_c_[in_effect_node_[i][0]];
-            ++weight_c_[in_effect_node_[i][1]];
+        if (in_effect_node_[vertex_id][0] != in_effect_node_[vertex_id][1]) {
+            ++weight_c_[in_effect_node_[vertex_id][0]];
+            ++weight_c_[in_effect_node_[vertex_id][1]];
         }
     }
-    for (int s1 = 0; s1 < number_of_ab_cycles_; ++s1) weight_rr_[s1][s1] = 0;
+    for (int s1 = 0; s1 < number_of_ab_cycles_; ++s1)
+        weight_rr_[s1][s1] = 0;
 }
 
 template <typename Distances>
-int Cross<Distances>::calc_c_naive() {
+int Cross<Distances>::calc_c_naive()
+{
     int count_c_nodes;
     int tally;
 
     count_c_nodes = 0;
 
-    for (int i = 0; i < number_of_vertices_; ++i) {
-        if (in_effect_node_[i][0] != -1 && in_effect_node_[i][1] != -1) {
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices_; ++vertex_id) {
+        if (in_effect_node_[vertex_id][0] != -1 && in_effect_node_[vertex_id][1] != -1) {
             tally = 0;
-            if (used_ab_cycle_[in_effect_node_[i][0]] == 1) ++tally;
-            if (used_ab_cycle_[in_effect_node_[i][1]] == 1) ++tally;
-            if (tally == 1) ++count_c_nodes;
+            if (used_ab_cycle_[in_effect_node_[vertex_id][0]] == 1)
+                ++tally;
+            if (used_ab_cycle_[in_effect_node_[vertex_id][1]] == 1)
+                ++tally;
+            if (tally == 1)
+                ++count_c_nodes;
         }
     }
     return count_c_nodes;
 }
 
 template <typename Distances>
-void Cross<Distances>::search_eset(int center_ab) {
+void Cross<Distances>::search_eset(int center_ab)
+{
     int iteration, stagnation;
     int delta_weight, min_delta_weight_non_tabu;
     int improving_change, non_tabu_change;
@@ -2298,8 +2425,7 @@ void Cross<Distances>::search_eset(int center_ab) {
                     non_tabu_change = 1;
                     min_delta_weight_non_tabu = delta_weight;
                 }
-            }
-            else if (used_ab_cycle_[s1] == 1 && s1 != center_ab) {
+            } else if (used_ab_cycle_[s1] == 1 && s1 != center_ab) {
                 delta_weight = - weight_c_[s1] + 2 * weight_sr_[s1];
                 if (number_of_c_nodes_ + delta_weight < best_number_of_c_nodes_) {
                     selected_ab_cycle = s1;
@@ -2315,8 +2441,11 @@ void Cross<Distances>::search_eset(int center_ab) {
         }
 
         if (improving_change != 0) {
-            if (improving_change == 1) this->add_ab(selected_ab_cycle);
-            else if (improving_change == -1) this->delete_ab(selected_ab_cycle);
+            if (improving_change == 1) {
+                this->add_ab(selected_ab_cycle);
+            } else if (improving_change == -1) {
+                this->delete_ab(selected_ab_cycle);
+            }
 
             moved_ab_cycle_[selected_ab_cycle] = iteration + random_integer(1, t_max_);
 
@@ -2324,40 +2453,47 @@ void Cross<Distances>::search_eset(int center_ab) {
 
             number_of_ab_cycles_in_eset_ = 0;
             for (int s1 = 0; s1 < number_of_ab_cycles_; ++s1)
-                if (used_ab_cycle_[s1] == 1) ab_cycle_in_eset_[number_of_ab_cycles_in_eset_++] = s1;
+                if (used_ab_cycle_[s1] == 1)
+                    ab_cycle_in_eset_[number_of_ab_cycles_in_eset_++] = s1;
 
             stagnation = 0;
-        }
-        else if (non_tabu_change != 0) {
-            if (non_tabu_change == 1) this->add_ab(selected_ab_cycle_non_tabu);
-            else if (non_tabu_change == -1)
-
-            this->delete_ab(selected_ab_cycle_non_tabu);
+        } else if (non_tabu_change != 0) {
+            if (non_tabu_change == 1) {
+                this->add_ab(selected_ab_cycle_non_tabu);
+            } else if (non_tabu_change == -1) {
+                this->delete_ab(selected_ab_cycle_non_tabu);
+            }
             moved_ab_cycle_[selected_ab_cycle_non_tabu] = iteration + random_integer(1, t_max_);
         }
-        if (improving_change == 0) ++stagnation;
-        if (stagnation == max_stagnation_) break;
+        if (improving_change == 0)
+            ++stagnation;
+        if (stagnation == max_stagnation_)
+            break;
     }
 }
 
 template <typename Distances>
-void Cross<Distances>::add_ab(int num) {
+void Cross<Distances>::add_ab(int num)
+{
     number_of_c_nodes_ += weight_c_[num] - 2 * weight_sr_[num];
     number_of_e_edges_ += ab_cycle_[num][0] / 2;
 
     used_ab_cycle_[num] = 1;
     ++number_of_used_ab_cycles_;
-    for (int s1 = 0; s1 < number_of_ab_cycles_; ++s1) weight_sr_[s1] += weight_rr_[s1][num];
+    for (int s1 = 0; s1 < number_of_ab_cycles_; ++s1)
+        weight_sr_[s1] += weight_rr_[s1][num];
 }
 
 template <typename Distances>
-void Cross<Distances>::delete_ab(int num) {
+void Cross<Distances>::delete_ab(int num)
+{
     number_of_c_nodes_ -= weight_c_[num] - 2 * weight_sr_[num];
     number_of_e_edges_ -= ab_cycle_[num][0] / 2;
 
     used_ab_cycle_[num] = 0;
     --number_of_used_ab_cycles_;
-    for (int s1 = 0; s1 < number_of_ab_cycles_; ++s1) weight_sr_[s1] -= weight_rr_[s1][num];
+    for (int s1 = 0; s1 < number_of_ab_cycles_; ++s1)
+        weight_sr_[s1] -= weight_rr_[s1][num];
 }
 
 /**
@@ -2374,7 +2510,7 @@ public:
     /** Constructor. */
     Environment(
             const Distances& distances,
-            int number_of_vertices,
+            VertexId number_of_vertices,
             int population_size,
             int number_of_children,
             double time_limit);
@@ -2383,7 +2519,7 @@ public:
     void run();
 
     /** Best tour found, as a 0-indexed list of vertices. */
-    std::vector<int> get_best_tour() const { return evaluator_.get_tour(best_individual_); }
+    std::vector<VertexId> get_best_tour() const { return evaluator_.get_tour(best_individual_); }
 
 private:
 
@@ -2477,7 +2613,7 @@ private:
 template <typename Distances>
 Environment<Distances>::Environment(
         const Distances& distances,
-        int number_of_vertices,
+        VertexId number_of_vertices,
         int population_size,
         int number_of_children,
         double time_limit):
@@ -2535,9 +2671,9 @@ bool Environment<Distances>::termination_condition()
     if (average_value_ - best_value_ < 0.001)
         return true;
     if (stage_ == 1) {
-        if (stagnation_count_ == int(1500 / number_of_children_) && max_stagnation_ == 0) // 1500/Nch
+        if (stagnation_count_ == int(1500 / number_of_children_) && max_stagnation_ == 0) { // 1500/Nch
             max_stagnation_ = int(current_number_of_generations_ / 10); // max_stagnation_ = G/10
-        else if (max_stagnation_ != 0 && max_stagnation_ <= stagnation_count_) {
+        } else if (max_stagnation_ != 0 && max_stagnation_ <= stagnation_count_) {
             stagnation_count_ = 0;
             max_stagnation_ = 0;
             number_of_generations_stage_1_ = current_number_of_generations_;
@@ -2547,10 +2683,11 @@ bool Environment<Distances>::termination_condition()
         return false;
     }
     if (stage_ == 2) {
-        if (stagnation_count_ == int(1500 / number_of_children_) && max_stagnation_ == 0) // 1500/Nch
+        if (stagnation_count_ == int(1500 / number_of_children_) && max_stagnation_ == 0) { // 1500/Nch
             max_stagnation_ = int((current_number_of_generations_ - number_of_generations_stage_1_) / 10); // max_stagnation_ = G/10
-        else if (max_stagnation_ != 0 && max_stagnation_ <= stagnation_count_)
+        } else if (max_stagnation_ != 0 && max_stagnation_ <= stagnation_count_) {
             return true;
+        }
         return false;
     }
 
@@ -2573,10 +2710,11 @@ void Environment<Distances>::set_average_best()
     }
     best_individual_ = population_[best_index_];
     average_value_ /= (double)population_size_;
-    if (best_individual_.length < stock_best)
+    if (best_individual_.length < stock_best) {
         stagnation_count_ = 0;
-    else
+    } else {
         ++stagnation_count_;
+    }
 }
 
 template <typename Distances>
@@ -2609,17 +2747,17 @@ void Environment<Distances>::generate_kids(
 template <typename Distances>
 void Environment<Distances>::compute_edge_frequencies()
 {
-    int number_of_vertices = evaluator_.number_of_vertices;
-    for (int j1 = 0; j1 < number_of_vertices; ++j1)
-        for (int j2 = 0; j2 < number_of_vertices; ++j2)
-            edge_frequency_[j1][j2] = 0;
+    VertexId number_of_vertices = evaluator_.number_of_vertices;
+    for (VertexId vertex_id_1 = 0; vertex_id_1 < number_of_vertices; ++vertex_id_1)
+        for (VertexId vertex_id_2 = 0; vertex_id_2 < number_of_vertices; ++vertex_id_2)
+            edge_frequency_[vertex_id_1][vertex_id_2] = 0;
 
     for (int i = 0; i < population_size_; ++i)
-        for (int j = 0; j < number_of_vertices; ++j) {
-            int k0 = population_[i].neighbors[j][0];
-            int k1 = population_[i].neighbors[j][1];
-            ++edge_frequency_[j][k0];
-            ++edge_frequency_[j][k1];
+        for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
+            VertexId neighbor_vertex_id_1 = population_[i].neighbors[vertex_id][0];
+            VertexId neighbor_vertex_id_2 = population_[i].neighbors[vertex_id][1];
+            ++edge_frequency_[vertex_id][neighbor_vertex_id_1];
+            ++edge_frequency_[vertex_id][neighbor_vertex_id_2];
         }
 }
 
@@ -2644,9 +2782,9 @@ const Output eax(
     // globals ('tRand'/'tSort') held no state of their own, so this
     // integration replaced them with plain functions ('random_*'/'sort_*'
     // above) instead of carrying that non-reentrancy hazard forward.
-    eax_ga::seed_random(parameters.seed);
+    seed_random(parameters.seed);
 
-    eax_ga::Environment<Distances> environment(
+    Environment<Distances> environment(
             distances,
             number_of_vertices,
             parameters.population_size,
@@ -2654,7 +2792,7 @@ const Output eax(
             parameters.timer.remaining_time());
     environment.run();
 
-    std::vector<int> tour = environment.get_best_tour();
+    std::vector<VertexId> tour = environment.get_best_tour();
 
     // 'tour[0]' is always city 0 (the traversal in 'get_tour' starts there),
     // and the 'Solution' constructor already starts with vertex 0, so it
