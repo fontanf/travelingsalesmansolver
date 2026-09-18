@@ -2,6 +2,8 @@
 
 #include "travelingsalesmansolver/distances/commons.hpp"
 
+#include "nlohmann/json.hpp"
+
 #include <vector>
 #include <cmath>
 #include <fstream>
@@ -56,6 +58,17 @@ public:
                 << " " << vertex.coordinates.y
                 << std::endl;
         }
+    }
+
+    /** Export to a JSON structure (the raw, pre-conversion coordinates -- 'set_coordinates' re-derives latitude/longitude from them). */
+    nlohmann::json to_json() const
+    {
+        nlohmann::json j;
+        j["type"] = "geo";
+        j["number_of_vertices"] = (VertexId)vertices_.size();
+        for (VertexId vertex_id = 0; vertex_id < (VertexId)vertices_.size(); ++vertex_id)
+            j["coordinates"][vertex_id] = {vertices_[vertex_id].coordinates.x, vertices_[vertex_id].coordinates.y};
+        return j;
     }
 
 private:

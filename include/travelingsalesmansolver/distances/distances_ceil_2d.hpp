@@ -2,6 +2,8 @@
 
 #include "travelingsalesmansolver/distances/commons.hpp"
 
+#include "nlohmann/json.hpp"
+
 #include <vector>
 #include <cmath>
 #include <fstream>
@@ -42,6 +44,17 @@ public:
                 << " " << vertex.y
                 << std::endl;
         }
+    }
+
+    /** Export to a JSON structure. */
+    nlohmann::json to_json() const
+    {
+        nlohmann::json j;
+        j["type"] = "ceil_2d";
+        j["number_of_vertices"] = (VertexId)vertices_.size();
+        for (VertexId vertex_id = 0; vertex_id < (VertexId)vertices_.size(); ++vertex_id)
+            j["coordinates"][vertex_id] = {vertices_[vertex_id].x, vertices_[vertex_id].y};
+        return j;
     }
 
 private:

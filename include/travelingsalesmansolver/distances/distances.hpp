@@ -9,6 +9,8 @@
 #include "travelingsalesmansolver/distances/distances_geo.hpp"
 #include "travelingsalesmansolver/distances/distances_att.hpp"
 
+#include "nlohmann/json.hpp"
+
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -157,6 +159,13 @@ public:
             const T& distances,
             std::ofstream& file) const;
 
+    /** Export to a JSON structure. */
+    nlohmann::json to_json() const;
+
+    /** Export to a JSON structure. */
+    template <typename T>
+    nlohmann::json to_json(const T& distances) const;
+
 private:
 
     /*
@@ -198,6 +207,12 @@ void Distances::write(
         std::ofstream& file) const
 {
     distances.write(file);
+}
+
+template <typename T>
+nlohmann::json Distances::to_json(const T& distances) const
+{
+    return distances.to_json();
 }
 
 template <typename T>

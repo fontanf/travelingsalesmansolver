@@ -2,6 +2,8 @@
 
 #include "travelingsalesmansolver/distances/commons.hpp"
 
+#include "nlohmann/json.hpp"
+
 #include <vector>
 #include <limits>
 #include <fstream>
@@ -38,6 +40,16 @@ public:
             }
         }
         file << std::endl;
+    }
+
+    /** Export to a JSON structure. */
+    nlohmann::json to_json() const
+    {
+        nlohmann::json j;
+        j["type"] = "explicit";
+        j["number_of_vertices"] = (VertexId)distances_.size();
+        j["matrix"] = distances_;
+        return j;
     }
 
 private:
