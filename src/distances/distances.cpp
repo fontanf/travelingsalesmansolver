@@ -24,3 +24,8 @@ void Distances::write(std::ofstream& file) const
     file << "DIMENSION: " << number_of_vertices() << std::endl;
     FUNCTION_WITH_DISTANCES_R(this->write, *this, file);
 }
+
+nlohmann::json Distances::to_json() const
+{
+    return FUNCTION_WITH_DISTANCES_0(this->to_json, *this);
+}

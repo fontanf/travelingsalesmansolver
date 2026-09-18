@@ -19,6 +19,13 @@ public:
             const std::string& tmp,
             const std::vector<std::string>& line);
 
+    /**
+     * Read distances from a JSON structure produced by 'Distances::to_json'
+     * -- sets the number of vertices and the concrete distances type/data
+     * (dispatched on the structure's "type" field) in one call.
+     */
+    void read_json(const nlohmann::json& json);
+
     /** Set the number of vertices. */
     void set_number_of_vertices(
             VertexId number_of_vertices)

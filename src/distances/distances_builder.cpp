@@ -226,6 +226,109 @@ bool DistancesBuilder::read_tsplib(
     return true;
 }
 
+void DistancesBuilder::read_json(const nlohmann::json& json)
+{
+    VertexId number_of_vertices = json.at("number_of_vertices").get<VertexId>();
+    set_number_of_vertices(number_of_vertices);
+    std::string type = json.at("type").get<std::string>();
+
+    if (type == "explicit") {
+        DistancesExplicitBuilder distances_explicit_builder;
+        distances_explicit_builder.set_number_of_vertices(number_of_vertices);
+        for (VertexId vertex_id_1 = 0; vertex_id_1 < number_of_vertices; ++vertex_id_1) {
+            for (VertexId vertex_id_2 = 0; vertex_id_2 < number_of_vertices; ++vertex_id_2) {
+                distances_explicit_builder.set_distance(
+                        vertex_id_1,
+                        vertex_id_2,
+                        json["matrix"][vertex_id_1][vertex_id_2].get<Distance>());
+            }
+        }
+        set_distances_explicit(distances_explicit_builder.build());
+
+    } else if (type == "explicit_triangle") {
+        DistancesExplicitTriangleBuilder distances_explicit_triangle_builder;
+        distances_explicit_triangle_builder.set_number_of_vertices(number_of_vertices);
+        for (VertexId vertex_id_1 = 0; vertex_id_1 < number_of_vertices; ++vertex_id_1) {
+            for (VertexId vertex_id_2 = 0; vertex_id_2 <= vertex_id_1; ++vertex_id_2) {
+                distances_explicit_triangle_builder.set_distance(
+                        vertex_id_1,
+                        vertex_id_2,
+                        json["matrix"][vertex_id_1][vertex_id_2].get<Distance>());
+            }
+        }
+        set_distances_explicit_triangle(distances_explicit_triangle_builder.build());
+
+    } else if (type == "euc_2d") {
+        DistancesEuc2DBuilder distances_euc_2d_builder;
+        distances_euc_2d_builder.set_number_of_vertices(number_of_vertices);
+        for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
+            distances_euc_2d_builder.set_coordinates(
+                    vertex_id,
+                    json["coordinates"][vertex_id][0].get<double>(),
+                    json["coordinates"][vertex_id][1].get<double>());
+        }
+        set_distances_euc_2d(distances_euc_2d_builder.build());
+
+    } else if (type == "euc_2d_unrounded") {
+        DistancesEuc2DUnroundedBuilder distances_euc_2d_unrounded_builder;
+        distances_euc_2d_unrounded_builder.set_number_of_vertices(number_of_vertices);
+        for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
+            distances_euc_2d_unrounded_builder.set_coordinates(
+                    vertex_id,
+                    json["coordinates"][vertex_id][0].get<double>(),
+                    json["coordinates"][vertex_id][1].get<double>());
+        }
+        set_distances_euc_2d_unrounded(distances_euc_2d_unrounded_builder.build());
+
+    } else if (type == "ceil_2d") {
+        DistancesCeil2DBuilder distances_ceil_2d_builder;
+        distances_ceil_2d_builder.set_number_of_vertices(number_of_vertices);
+        for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
+            distances_ceil_2d_builder.set_coordinates(
+                    vertex_id,
+                    json["coordinates"][vertex_id][0].get<double>(),
+                    json["coordinates"][vertex_id][1].get<double>());
+        }
+        set_distances_ceil_2d(distances_ceil_2d_builder.build());
+
+    } else if (type == "man_2d") {
+        DistancesMan2DBuilder distances_man_2d_builder;
+        distances_man_2d_builder.set_number_of_vertices(number_of_vertices);
+        for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
+            distances_man_2d_builder.set_coordinates(
+                    vertex_id,
+                    json["coordinates"][vertex_id][0].get<double>(),
+                    json["coordinates"][vertex_id][1].get<double>());
+        }
+        set_distances_man_2d(distances_man_2d_builder.build());
+
+    } else if (type == "geo") {
+        DistancesGeoBuilder distances_geo_builder;
+        distances_geo_builder.set_number_of_vertices(number_of_vertices);
+        for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
+            distances_geo_builder.set_coordinates(
+                    vertex_id,
+                    json["coordinates"][vertex_id][0].get<double>(),
+                    json["coordinates"][vertex_id][1].get<double>());
+        }
+        set_distances_geo(distances_geo_builder.build());
+
+    } else if (type == "att") {
+        DistancesAttBuilder distances_att_builder;
+        distances_att_builder.set_number_of_vertices(number_of_vertices);
+        for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
+            distances_att_builder.set_coordinates(
+                    vertex_id,
+                    json["coordinates"][vertex_id][0].get<double>(),
+                    json["coordinates"][vertex_id][1].get<double>());
+        }
+        set_distances_att(distances_att_builder.build());
+
+    } else {
+        throw std::invalid_argument("DistancesBuilder::read_json: unknown distances type \"" + type + "\".");
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////// Build /////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
