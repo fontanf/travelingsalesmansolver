@@ -13,7 +13,7 @@ using namespace travelingsalesmansolver;
 
 namespace travelingsalesmansolver
 {
-namespace eax_ga
+namespace
 {
 
 bool Individual::operator==(
@@ -24,14 +24,14 @@ bool Individual::operator==(
     if (length != individual.length)
         return false;
 
-    int curr = 0;
-    int pre = -1;
+    VertexId current_vertex_id = 0;
+    VertexId previous_vertex_id = -1;
     for (std::size_t i = 0; i < neighbors.size(); ++i) {
-        int next = (neighbors[curr][0] == pre)? neighbors[curr][1]: neighbors[curr][0];
-        if (individual.neighbors[curr][0] != next && individual.neighbors[curr][1] != next)
+        VertexId next_vertex_id = (neighbors[current_vertex_id][0] == previous_vertex_id)? neighbors[current_vertex_id][1]: neighbors[current_vertex_id][0];
+        if (individual.neighbors[current_vertex_id][0] != next_vertex_id && individual.neighbors[current_vertex_id][1] != next_vertex_id)
             return false;
-        pre = curr;
-        curr = next;
+        previous_vertex_id = current_vertex_id;
+        current_vertex_id = next_vertex_id;
     }
     return true;
 }
