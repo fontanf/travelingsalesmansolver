@@ -16,11 +16,11 @@ target_link_libraries(TravelingSalesmanSolver_lkh PUBLIC
     TravelingSalesmanSolver_traveling_salesman)
 add_library(TravelingSalesmanSolver::lkh ALIAS TravelingSalesmanSolver_lkh)
 
-add_library(TravelingSalesmanSolver_eax)
-target_sources(TravelingSalesmanSolver_eax PRIVATE
-    eax.cpp)
-target_include_directories(TravelingSalesmanSolver_eax PUBLIC
+add_library(TravelingSalesmanSolver_local_search)
+target_sources(TravelingSalesmanSolver_local_search PRIVATE
+    local_search.cpp)
+target_include_directories(TravelingSalesmanSolver_local_search PUBLIC
     ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(TravelingSalesmanSolver_eax PUBLIC
+target_link_libraries(TravelingSalesmanSolver_local_search PUBLIC
     TravelingSalesmanSolver_traveling_salesman)
-add_library(TravelingSalesmanSolver::eax ALIAS TravelingSalesmanSolver_eax)
+add_library(TravelingSalesmanSolver::local_search ALIAS TravelingSalesmanSolver_local_search)
