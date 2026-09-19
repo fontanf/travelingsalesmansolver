@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <ctime>
 #include <limits>
 #include <vector>
 
@@ -164,9 +163,13 @@ void sort_ascending(
 template <typename Distances>
 struct LocalSearchData
 {
-    /** Constructor: binds 'distances' and sizes/computes everything that only depends on 'number_of_vertices'. */
+    /** Constructor: binds 'distances'/'instance'/'parameters'/'output'/'algorithm_formatter' and sizes/computes everything that only depends on 'number_of_vertices'. */
     LocalSearchData(
             const Distances& distances,
+            const Instance& instance,
+            const LocalSearchParameters& parameters,
+            const Output& output,
+            AlgorithmFormatter& algorithm_formatter,
             VertexId number_of_vertices);
 
     ////////////////////////////////////////////////////////////////////////
@@ -175,6 +178,18 @@ struct LocalSearchData
 
     /** Distances between vertices. */
     const Distances& distances;
+
+    /** Instance, used to build a 'Solution' every time a new best individual is found. */
+    const Instance& instance;
+
+    /** Algorithm parameters (used to check 'parameters.timer.needs_to_end()'). */
+    const LocalSearchParameters& parameters;
+
+    /** Used to cheaply check whether a candidate individual actually improves on the best solution found so far, before converting it to a 'Solution'. */
+    const Output& output;
+
+    /** Used to report every new best individual found, as soon as it is found. */
+    AlgorithmFormatter& algorithm_formatter;
 
     /** Number of vertices. */
     VertexId number_of_vertices;
@@ -393,12 +408,6 @@ struct LocalSearchData
 
     /** Number of generations elapsed when stage 1 completed. */
     int number_of_generations_stage_1 = 0;
-
-    /** Time at which 'run()' started. */
-    clock_t time_start = 0;
-
-    /** Wall-clock time limit in seconds. */
-    double time_limit;
 };
 
 /** Number of nearest neighbors stored per vertex in 'near_cities'/'inverse_near_list'. */
@@ -431,12 +440,32 @@ std::vector<VertexId> get_tour(
         const LocalSearchData<Distances>& data,
         const Individual& individual);
 
-/** Best tour found, as a 0-indexed list of vertices. */
+/**
+ * If 'individual' is strictly better than the previously reported solution,
+ * build a 'Solution' from it and report it via
+ * 'data.algorithm_formatter.update_solution()'; this can be called
+ * unconditionally every time a candidate best individual is found.
+ */
 template <typename Distances>
-std::vector<VertexId> get_best_tour(
-        const LocalSearchData<Distances>& data)
+void update_best_solution(
+        LocalSearchData<Distances>& data,
+        const Individual& individual,
+        const std::string& comment)
 {
-    return get_tour(data, data.best_individual);
+    if (data.output.solution.feasible()
+            && individual.length >= data.output.solution.objective_value())
+        return;
+
+    std::vector<VertexId> tour = get_tour(data, individual);
+
+    // 'tour[0]' is always city 0 (the traversal in 'get_tour' starts there),
+    // and the 'Solution' constructor already starts with vertex 0, so it
+    // must be skipped here to avoid visiting it twice.
+    Solution solution(data.instance);
+    for (std::size_t i = 1; i < tour.size(); ++i)
+        solution.add_vertex(data.distances, tour[i]);
+
+    data.algorithm_formatter.update_solution(solution, comment);
 }
 
 /**
@@ -616,23 +645,12 @@ void delete_ab(
         LocalSearchData<Distances>& data,
         int num);
 
-/**
- * The genetic algorithm's main loop: maintains a population of individuals,
- * combining pairs of them with 'run_cross()' and locally optimizing the
- * result with 'run_kopt()' each generation.
- */
-
 /** Size/fill every field of 'data' that depends on 'population_size'/'number_of_children'. */
 template <typename Distances>
 void init(
         LocalSearchData<Distances>& data,
         int population_size,
         int number_of_children);
-
-/** Run the genetic algorithm until termination. */
-template <typename Distances>
-void run(
-        LocalSearchData<Distances>& data);
 
 /** Reset the generation counters and eset-selection strategy at the start of a run. */
 template <typename Distances>
@@ -673,8 +691,16 @@ void compute_edge_frequencies(
 template <typename Distances>
 LocalSearchData<Distances>::LocalSearchData(
         const Distances& distances,
+        const Instance& instance,
+        const LocalSearchParameters& parameters,
+        const Output& output,
+        AlgorithmFormatter& algorithm_formatter,
         VertexId number_of_vertices):
     distances(distances),
+    instance(instance),
+    parameters(parameters),
+    output(output),
+    algorithm_formatter(algorithm_formatter),
     number_of_vertices(number_of_vertices),
     near_cities(number_of_vertices, std::vector<VertexId>(max_near_cities + 1)),
     inverse_near_list(number_of_vertices),
@@ -2709,28 +2735,6 @@ void delete_ab(
 
 
 template <typename Distances>
-void run(
-        LocalSearchData<Distances>& data)
-{
-    data.time_start = clock();
-    init_population(data);
-    reset_state(data);
-
-    compute_edge_frequencies(data);
-    while (true) {
-        set_average_best(data);
-        if (termination_condition(data))
-            break;
-
-        select_for_mating(data);
-        for (int s = 0; s < data.population_size; ++s)
-            generate_kids(data, s);
-
-        ++data.current_number_of_generations;
-    }
-}
-
-template <typename Distances>
 void reset_state(
         LocalSearchData<Distances>& data)
 {
@@ -2747,7 +2751,7 @@ template <typename Distances>
 bool termination_condition(
         LocalSearchData<Distances>& data)
 {
-    if ((double)(clock() - data.time_start) / CLOCKS_PER_SEC >= data.time_limit)
+    if (data.parameters.timer.needs_to_end())
         return true;
     if (data.average_value - data.best_value < 0.001)
         return true;
@@ -2804,8 +2808,13 @@ void init_population(
         LocalSearchData<Distances>& data)
 {
     for (int i = 0; i < data.population_size; ++i) {
+        // Check end.
+        if (data.parameters.timer.needs_to_end())
+            break;
+
         make_random_solution(data, data.population[i]); // randomly sets a data.route
         run_kopt(data, data.population[i]); // local search (2-opt neighborhood)
+        update_best_solution(data, data.population[i], "individual " + std::to_string(i));
     }
 }
 
@@ -2868,21 +2877,31 @@ const Output local_search(
     // above) instead of carrying that non-reentrancy hazard forward.
     seed_random(parameters.seed);
 
-    LocalSearchData<Distances> data(distances, number_of_vertices);
+    LocalSearchData<Distances> data(distances, instance, parameters, output, algorithm_formatter, number_of_vertices);
     init(data, parameters.population_size, parameters.number_of_children);
-    data.time_limit = parameters.timer.remaining_time();
-    run(data);
 
-    std::vector<VertexId> tour = get_best_tour(data);
+    init_population(data);
 
-    // 'tour[0]' is always city 0 (the traversal in 'get_tour' starts there),
-    // and the 'Solution' constructor already starts with vertex 0, so it
-    // must be skipped here to avoid visiting it twice.
-    Solution solution(instance);
-    for (std::size_t i = 1; i < tour.size(); ++i)
-        solution.add_vertex(distances, tour[i]);
+    if (!data.parameters.timer.needs_to_end()) {
+        reset_state(data);
 
-    algorithm_formatter.update_solution(solution, "final solution");
+        // The genetic algorithm's main loop: maintains a population of
+        // individuals, combining pairs of them with 'run_cross()' and locally
+        // optimizing the result with 'run_kopt()' each generation.
+        compute_edge_frequencies(data);
+        while (true) {
+            set_average_best(data);
+            update_best_solution(data, data.best_individual, "generation " + std::to_string(data.current_number_of_generations));
+            if (termination_condition(data))
+                break;
+
+            select_for_mating(data);
+            for (int s = 0; s < data.population_size; ++s)
+                generate_kids(data, s);
+
+            ++data.current_number_of_generations;
+        }
+    }
 
     algorithm_formatter.end();
     return output;
