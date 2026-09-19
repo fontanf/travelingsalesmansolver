@@ -434,39 +434,11 @@ void evaluate(
         const LocalSearchData<Distances>& data,
         Individual& individual);
 
-/** Return the individual's tour as a 0-indexed list of vertices. */
+/** Build a 'Solution' from the individual's tour. */
 template <typename Distances>
-std::vector<VertexId> get_tour(
+Solution to_solution(
         const LocalSearchData<Distances>& data,
         const Individual& individual);
-
-/**
- * If 'individual' is strictly better than the previously reported solution,
- * build a 'Solution' from it and report it via
- * 'data.algorithm_formatter.update_solution()'; this can be called
- * unconditionally every time a candidate best individual is found.
- */
-template <typename Distances>
-void update_best_solution(
-        LocalSearchData<Distances>& data,
-        const Individual& individual,
-        const std::string& comment)
-{
-    if (data.output.solution.feasible()
-            && individual.length >= data.output.solution.objective_value())
-        return;
-
-    std::vector<VertexId> tour = get_tour(data, individual);
-
-    // 'tour[0]' is always city 0 (the traversal in 'get_tour' starts there),
-    // and the 'Solution' constructor already starts with vertex 0, so it
-    // must be skipped here to avoid visiting it twice.
-    Solution solution(data.instance);
-    for (std::size_t i = 1; i < tour.size(); ++i)
-        solution.add_vertex(data.distances, tour[i]);
-
-    data.algorithm_formatter.update_solution(solution, comment);
-}
 
 /**
  * 2-opt local search, operating on a segment-tree representation of the
@@ -882,16 +854,17 @@ void evaluate(
 }
 
 template <typename Distances>
-std::vector<VertexId> get_tour(
+Solution to_solution(
         const LocalSearchData<Distances>& data,
         const Individual& individual)
 {
-    std::vector<VertexId> tour(data.number_of_vertices);
+    // 'Solution' already starts at vertex 0, so it must not be added again
+    // here.
+    Solution solution(data.instance);
     VertexId current_vertex_id = 0;
     VertexId start_vertex_id = 0;
     VertexId previous_vertex_id = -1;
     for (int count = 0; count < data.number_of_vertices; ++count) {
-        tour[count] = current_vertex_id;
         VertexId next_vertex_id = (individual.neighbors[current_vertex_id][0] == previous_vertex_id)?
             individual.neighbors[current_vertex_id][1]:
             individual.neighbors[current_vertex_id][0];
@@ -899,8 +872,9 @@ std::vector<VertexId> get_tour(
         current_vertex_id = next_vertex_id;
         if (current_vertex_id == start_vertex_id)
             break;
+        solution.add_vertex(data.distances, current_vertex_id);
     }
-    return tour;
+    return solution;
 }
 
 template <typename Distances>
@@ -2808,13 +2782,20 @@ void init_population(
         LocalSearchData<Distances>& data)
 {
     for (int i = 0; i < data.population_size; ++i) {
-        // Check end.
-        if (data.parameters.timer.needs_to_end())
+        // Always build at least the first individual regardless of the time
+        // budget, so there is always a solution to report.
+        if (i > 0 && data.parameters.timer.needs_to_end())
             break;
 
         make_random_solution(data, data.population[i]); // randomly sets a data.route
         run_kopt(data, data.population[i]); // local search (2-opt neighborhood)
-        update_best_solution(data, data.population[i], "individual " + std::to_string(i));
+
+        if (!data.output.solution.feasible()
+                || data.population[i].length < data.output.solution.objective_value()) {
+            data.algorithm_formatter.update_solution(
+                    to_solution(data, data.population[i]),
+                    "individual " + std::to_string(i));
+        }
     }
 }
 
@@ -2891,7 +2872,12 @@ const Output local_search(
         compute_edge_frequencies(data);
         while (true) {
             set_average_best(data);
-            update_best_solution(data, data.best_individual, "generation " + std::to_string(data.current_number_of_generations));
+            if (!data.output.solution.feasible()
+                    || data.best_individual.length < data.output.solution.objective_value()) {
+                data.algorithm_formatter.update_solution(
+                        to_solution(data, data.best_individual),
+                        "generation " + std::to_string(data.current_number_of_generations));
+            }
             if (termination_condition(data))
                 break;
 
