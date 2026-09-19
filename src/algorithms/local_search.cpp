@@ -1,10 +1,10 @@
-// The EAX genetic algorithm implemented in 'eax.hpp' is adapted from Shujia
-// Liu's C++ implementation (https://github.com/Sugia/GA-for-TSP), licensed
-// under the Apache License, Version 2.0; see 'licenses/eax-ga/LICENSE' and
-// 'licenses/eax-ga/NOTICE.md' for the license text and the full list of
-// changes made to the original source.
+// The EAX genetic algorithm implemented in 'local_search.hpp' is adapted from
+// Shujia Liu's C++ implementation (https://github.com/Sugia/GA-for-TSP),
+// licensed under the Apache License, Version 2.0; see
+// 'licenses/eax-ga/LICENSE' and 'licenses/eax-ga/NOTICE.md' for the license
+// text and the full list of changes made to the original source.
 
-#include "travelingsalesmansolver/algorithms/eax.hpp"
+#include "travelingsalesmansolver/algorithms/local_search.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -198,12 +198,12 @@ void sort_ascending(
 }
 }
 
-const Output travelingsalesmansolver::eax(
+const Output travelingsalesmansolver::local_search(
         const Instance& instance,
-        const EaxParameters& parameters)
+        const LocalSearchParameters& parameters)
 {
     return FUNCTION_WITH_DISTANCES(
-            eax,
+            local_search,
             instance.distances(),
             instance,
             parameters);

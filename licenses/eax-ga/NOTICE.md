@@ -17,7 +17,7 @@ Changes made to the original source:
   a `Distances` type and hold a `const Distances&` (via `TEvaluator`)
   instead of copying distances into an `int` matrix (`fEdgeDis`) or reading
   them from a TSPLIB file: `TEvaluator::distance(i, j)` looks them up
-  directly on the original object, dispatched once per `eax()` call via
+  directly on the original object, dispatched once per `local_search()` call via
   the `Distances` template parameter, the same way every other algorithm
   in this library consumes distances. As part of this, every
   distance/gain/tour-length-valued field or local variable that used to be
@@ -47,15 +47,16 @@ Changes made to the original source:
   `indi.*`, `randomize.*`, and `sort.*` are untouched by this and remain
   separately-compiled, since none of them depend on `Distances`.
 - `main.cpp`/`main.h` (the original's interactive driver) were not vendored;
-  they are replaced by `travelingsalesmansolver::eax()` in
-  `include/travelingsalesmansolver/algorithms/eax.hpp`.
+  they are replaced by `travelingsalesmansolver::local_search()` (originally
+  named `eax()`; see further down for why it was renamed) in
+  `include/travelingsalesmansolver/algorithms/local_search.hpp`.
 
 ## Full rewrite into the project's coding style
 
 The 11 files that used to make up this integration (`eax.hpp`/`eax.cpp` plus
 the `algorithms/eax/{cross,environment,evaluator,indi,kopt,randomize,sort}.*`
-subdirectories) were consolidated into just `include/travelingsalesmansolver/algorithms/eax.hpp`
-(all `Distances`-templated code) and `src/algorithms/eax.cpp` (everything
+subdirectories) were consolidated into just `include/travelingsalesmansolver/algorithms/local_search.hpp`
+(all `Distances`-templated code) and `src/algorithms/local_search.cpp` (everything
 else), and this `LICENSE`/`NOTICE.md` pair moved here, to
 `licenses/eax-ga/`, since there is no longer an `algorithms/eax/`
 subdirectory for them to live in.
@@ -79,9 +80,9 @@ hazard around `InitSort()` that a comment in this file used to document
 (`tSort` staying null until the GA reached a "Block2" eset stage, which only
 small/quick-converging instances never hit). `InitURandom`/`InitSort`
 themselves are gone; the equivalent seeding is `seed_random(seed)`, called
-once from `eax()`.
+once from `local_search()`.
 
-The following genuinely dead code (unreachable from `eax()`, left over from
+The following genuinely dead code (unreachable from `local_search()`, left over from
 the original's un-vendored interactive `main.cpp` driver) was removed:
 `Environment::printOn`/`writeBest`, `Evaluator::writeTo`/`checkValid`, and
 `KOpt::checkDetail`/`checkValid`. A handful of write-only/never-read fields
@@ -144,7 +145,115 @@ deliberately left as plain `int`, including the mixed-semantics `ab_cycle_`
 array (`ab_cycle_[c][0]` is a cycle-length count, `ab_cycle_[c][1..]` are
 vertex ids) — see the source for the remaining per-variable judgment calls.
 The nested `eax_ga` namespace also became anonymous in this pass, since
-every template class in it is only ever instantiated from `eax.cpp`'s
+every template class in it is only ever instantiated from `local_search.cpp`'s
 translation unit (via `FUNCTION_WITH_DISTANCES`) — `main.cpp` only calls
-the non-template `eax()` — so there is no ODR risk despite this being a
-header.
+the non-template `local_search()` — so there is no ODR risk despite this
+being a header.
+
+## Renamed the public API from `eax` to `local_search`
+
+`eax.hpp`/`eax.cpp` were renamed to `local_search.hpp`/`local_search.cpp`,
+`EaxParameters` to `LocalSearchParameters`, the `eax()` functions to
+`local_search()`, the CLI algorithm name from `-a eax` to `-a local_search`,
+and the printed algorithm name from `EAX` to `Local Search`. This only
+changes this project's own label for the entry point; the algorithm itself
+is still literally the Edge Assembly Crossover genetic algorithm described
+above, and this directory's name (`licenses/eax-ga/`) and the vendored
+attribution in this file are unchanged since they describe the actual
+upstream technique, not this project's chosen name for it.
+
+## Flattened `Evaluator`/`KOpt`/`Cross`/`Environment` into `LocalSearchData` + free functions
+
+Following the same pattern as `local_search_pfss_makespan.cpp` (a single
+`struct LocalSearchData` holding all mutable working state, with every
+operation a free function taking it in place of an implicit `this`), the
+four classes were merged into one `template <typename Distances> struct
+LocalSearchData` plus free functions in the same anonymous namespace.
+`Individual` is unaffected (it was already a plain data holder with no
+methods beyond `operator==`, which is unchanged). Unlike
+`local_search_pfss_makespan`'s helpers, these free functions do not take a
+`const Instance&`: they never needed one (distances/near-neighbor lists
+were already cached in what was `Evaluator`), so it would have been an
+unused parameter forced in purely to match the reference pattern's shape.
+
+Flattening surfaced several same-named members from different classes that
+would have silently aliased into one field (each class currently keeps its
+own separate copy, so no behavior changed before this point, only after
+flattening would collapsing them have become a real bug). These were
+deliberately kept distinct (see `LocalSearchData`'s own comment in
+`local_search.hpp` for the equivalent detail):
+- `KOpt::number_of_segments_` (current number of segments in the 2-opt tree
+  representation) vs `Cross::number_of_segments_` (path segments built by
+  `make_complete_sol()`/`make_unit()`) -> `number_of_tree_segments` and
+  `number_of_segments` respectively.
+- `Cross::max_stagnation_` ("Block2" eset local search stagnation limit in
+  `search_eset()`) vs `Environment::max_stagnation_` (generation-level
+  stage-1 -> stage-2 stagnation limit) -> `eset_max_stagnation` and
+  `max_stagnation` respectively. This is the one the user flagged up front
+  as the most dangerous of the three: since "Block2" is only reached after
+  enough stalled generations, a small/quick-converging instance (e.g.
+  a280) would never exercise the colliding field and the corruption would
+  only show up as quietly worse solutions on harder instances — the same
+  general hazard class as the `tSort`/"Block2" non-reentrancy issue
+  documented earlier in this file.
+- `KOpt::next_city()`/`previous_city()` (free functions after flattening)
+  vs `Cross::current_city_`/`previous_city_` (AB-cycle trace state) — not
+  found by inspection, only by mechanically stripping every member's
+  trailing underscore and diffing all four classes' method and field names
+  against each other pairwise. `Cross`'s fields became
+  `trace_current_city`/`trace_previous_city` (with `trace_start_` also
+  renamed to `trace_start` for consistency, though it had no collision).
+
+Fields that were genuinely the same value in multiple classes (all set from
+the same constructor argument, so unifying them is not a behavior change)
+were merged into one field: `number_of_vertices` (was
+`Evaluator::number_of_vertices`/`KOpt::number_of_vertices_`/
+`Cross::number_of_vertices_`), `population_size` (was
+`Cross::population_size_`/`Environment::population_size_`), and the
+nearest-neighbor list size (was `Evaluator::max_near_cities_`/
+`KOpt::max_near_cities_used_`, both hardcoded to `50`) into one file-scope
+`constexpr int max_near_cities`. `Evaluator` itself disappears as a
+sub-object: its fields (`distances`, `near_cities`, `number_of_vertices`)
+are now direct fields of `LocalSearchData`, and call sites that used to say
+`evaluator_.distance(a, b)` now say `distance(data, a, b)` via a small
+inline free-function wrapper around `data.distances.distance(a, b)`.
+
+Two now-redundant parameters were dropped as a direct, mechanical
+consequence of the flattening, not a separate design change: `Cross`'s
+`flags`/`edge_frequency` parameters (originally threaded in by reference
+from `Environment`'s `fFlagC`/`fEdgeFreq` fields, since `Cross` had no
+access to `Environment`'s data otherwise) are gone from `run_cross()`,
+`set_parents()`, `set_ab_cycle()`, `increment_edge_freq()`,
+`calc_adaptive_loss()`, and `calc_entropy_loss()`, which now read
+`data.flags`/`data.edge_frequency` directly like every other field.
+
+`LocalSearchData`'s constructor is kept minimal, matching the reference
+pattern's spirit: it only binds the `const Distances&` reference member
+(which cannot be default-constructed and assigned later) and sizes/computes
+everything that depends solely on `number_of_vertices` (near-neighbor
+lists, the 2-opt tree's working arrays, the inverse near-neighbor list —
+this is genuine computation, not just sizing, so it stays in the
+constructor rather than moving to `init()`). Everything that additionally
+depends on `population_size`/`number_of_children` (formerly split across
+`Cross`'s and `Environment`'s constructors) moved to a free function
+`init(data, population_size, number_of_children)`, called once from
+`local_search()`'s entry point — mirroring how `local_search_pfss_makespan()`
+sizes `data.completion_times_0` etc. directly in its own entry point rather
+than in a constructor.
+
+Three methods were unambiguously renamed since, as free functions in one
+shared namespace, they could no longer be disambiguated by class scope:
+`Environment::run()` (the top-level generation loop, called from the
+public `local_search()` entry point) stays plain `run()`; `KOpt::run()`
+(local search on one individual) becomes `run_kopt()`; `Cross::run()`
+(crossover for one mating pair) becomes `run_cross()`.
+
+Updated to describe the flattened code shape: `set_parents()`'s local that
+reproduces the preserved `distance_ab`/`distance_ab_local` bug (see above)
+no longer "shadows a class member" in the free-function version, since
+there is no implicit `this` to shadow through — it is now more precisely
+described as: the local `distance_ab_local` is computed but never written
+back to `data.distance_ab`, so `run_cross()`'s later read of `data.distance_ab`
+still sees a stale value from a previous call (or 0, on the very first
+call). Behavior is identical; only the description of the mechanism
+changed to match the new code shape.

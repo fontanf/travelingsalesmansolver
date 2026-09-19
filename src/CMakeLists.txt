@@ -22,7 +22,7 @@ if(TRAVELINGSALESMANSOLVER_BUILD_MAIN)
   target_link_libraries(TravelingSalesmanSolver_main PUBLIC
       TravelingSalesmanSolver_lkh
       TravelingSalesmanSolver_concorde
-      TravelingSalesmanSolver_eax
+      TravelingSalesmanSolver_local_search
       Boost::program_options)
   set_target_properties(TravelingSalesmanSolver_main PROPERTIES OUTPUT_NAME "travelingsalesmansolver")
   install(TARGETS TravelingSalesmanSolver_main)
