@@ -7,8 +7,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstdlib>
 #include <limits>
+#include <numeric>
+#include <random>
 #include <utility>
 #include <vector>
 
@@ -93,173 +94,6 @@ struct Individual
     Distance length = 0;
 };
 
-/** Seed the random number generator used throughout the algorithm. */
-inline void seed_random(int seed)
-{
-    std::srand(seed);
-}
-
-/** Random integer in ['min', 'max']. */
-inline int random_integer(int min, int max)
-{
-    return min + (std::rand() % (max - min + 1));
-}
-
-inline double random_double(double min, double max)
-{
-    return min + std::rand() % (int)(max - min);
-}
-
-/** Random number drawn from the normal distribution of mean 'mu' and standard deviation 'sigma'. */
-inline double random_normal(double mu, double sigma)
-{
-    const double pi = 3.1415926;
-    double u1;
-    do {
-        u1 = random_double(0.0, 1.0);
-    } while (u1 == 0.0);
-    double u2 = random_double(0.0, 1.0);
-    double x = std::sqrt(-2.0 * std::log(u1)) * std::cos(2 * pi * u2);
-    return mu + sigma * x;
-}
-
-/**
- * Fill 'array' with 'number_of_samples' distinct random values from
- * [0, number_of_elements[.
- */
-inline void random_permutation(
-        std::vector<int>& array,
-        int number_of_elements,
-        int number_of_samples)
-{
-    if (number_of_elements <= 0)
-        return;
-    std::vector<int> visited(number_of_elements, 0);
-    for (int i = 0; i < number_of_samples; ++i) {
-        int r = std::rand() % (number_of_elements - i);
-        while (visited[r] == 1)
-            r = (r + 1) % number_of_elements;
-        array[i] = r;
-        visited[r] = 1;
-    }
-}
-
-/** Randomly shuffle the first 'number_of_elements' elements of 'array'. */
-inline void random_shuffle(
-        std::vector<int>& array,
-        int number_of_elements)
-{
-    std::vector<int> shuffled_positions(number_of_elements);
-    random_permutation(shuffled_positions, number_of_elements, number_of_elements);
-    std::vector<int> original(array.begin(), array.begin() + number_of_elements);
-    for (int i = 0; i < number_of_elements; ++i)
-        array[i] = original[shuffled_positions[i]];
-}
-
-inline void selection_sort(
-        std::vector<int>& values,
-        int l,
-        int r)
-{
-    for (int i = l; i < r; ++i) {
-        int id = i;
-        for (int j = i + 1; j <= r; ++j)
-            if (values[j] < values[id])
-                id = j;
-        std::swap(values[i], values[id]);
-    }
-}
-
-inline int quick_sort_partition(
-        std::vector<int>& values,
-        int l,
-        int r)
-{
-    int id = l + std::rand() % (r - l + 1);
-    std::swap(values[l], values[id]);
-    id = l;
-    for (int i = l + 1; i <= r; ++i)
-        if (values[i] < values[l])
-            std::swap(values[++id], values[i]);
-    std::swap(values[l], values[id]);
-    return id;
-}
-
-inline void quick_sort(
-        std::vector<int>& values,
-        int l,
-        int r)
-{
-    if (l < r) {
-        if (r - l < 20) { // utilizes selection sort for small batch of data
-            selection_sort(values, l, r);
-            return;
-        }
-        int mid = quick_sort_partition(values, l, r);
-        quick_sort(values, l, mid - 1);
-        quick_sort(values, mid + 1, r);
-    }
-}
-
-/**
- * Fill the first 'number_of_indices' elements of 'sorted_indices' with the
- * indices, among the first 'number_of_values' elements of 'values', of the
- * 'number_of_indices' smallest ones, in increasing order of value.
- */
-inline void sort_indices_ascending(
-        const std::vector<int>& values,
-        int number_of_values,
-        std::vector<int>& sorted_indices,
-        int number_of_indices)
-{
-    std::vector<int> checked(number_of_values, 0);
-    for (int i = 0; i < number_of_indices; ++i) {
-        int best_value = std::numeric_limits<int>::max();
-        int best_index = 0;
-        for (int j = 0; j < number_of_values; ++j) {
-            if (values[j] < best_value && checked[j] == 0) {
-                best_value = values[j];
-                best_index = j;
-            }
-        }
-        sorted_indices[i] = best_index;
-        checked[best_index] = 1;
-    }
-}
-
-/**
- * Fill the first 'number_of_indices' elements of 'sorted_indices' with the
- * indices, among the first 'number_of_values' elements of 'values', of the
- * 'number_of_indices' largest ones, in decreasing order of value.
- */
-inline void sort_indices_descending(
-        const std::vector<int>& values,
-        int number_of_values,
-        std::vector<int>& sorted_indices,
-        int number_of_indices)
-{
-    std::vector<int> checked(number_of_values, 0);
-    for (int i = 0; i < number_of_indices; ++i) {
-        int best_value = std::numeric_limits<int>::min();
-        int best_index = 0;
-        for (int j = 0; j < number_of_values; ++j) {
-            if (values[j] > best_value && checked[j] == 0) {
-                best_value = values[j];
-                best_index = j;
-            }
-        }
-        sorted_indices[i] = best_index;
-        checked[best_index] = 1;
-    }
-}
-
-/** Sort the first 'number_of_values' elements of 'values' in increasing order. */
-inline void sort_ascending(
-        std::vector<int>& values,
-        int number_of_values)
-{
-    quick_sort(values, 0, number_of_values - 1);
-}
 /**
  * All mutable working state for the EAX genetic algorithm, shared by every
  * free function below in place of the 'Evaluator'/'KOpt'/'Cross'/'Environment'
@@ -329,6 +163,9 @@ struct LocalSearchData
 
     /** Number of vertices. */
     VertexId number_of_vertices;
+
+    /** Random number generator, seeded with 'parameters.seed'. */
+    std::mt19937_64 generator;
 
     /**
      * Number of nearest neighbors stored per vertex (excluding the vertex
@@ -616,6 +453,7 @@ LocalSearchData<Distances>::LocalSearchData(
     output(output),
     algorithm_formatter(algorithm_formatter),
     number_of_vertices(number_of_vertices),
+    generator(parameters.seed),
     number_of_near_cities(std::min<VertexId>(max_near_cities, number_of_vertices - 1)),
     near_cities(number_of_vertices, std::vector<VertexId>(number_of_near_cities + 1)),
     inverse_near_list(number_of_vertices),
@@ -1235,7 +1073,7 @@ void optimize(
     std::fill(data.active.begin(), data.active.end(), 1);
 BEGIN:
     {
-        VertexId t1_start = random_integer(0, data.number_of_vertices - 1);
+        VertexId t1_start = std::uniform_int_distribution<int>(0, data.number_of_vertices - 1)(data.generator);
         data.t[1] = t1_start;
         while (true) {
             data.t[1] = next_city(data, data.t[1]);
@@ -1308,7 +1146,7 @@ void make_random_solution(
         data.remaining[vertex_id] = vertex_id;
     std::vector<VertexId> gene(data.number_of_vertices);
     for (int i = 0; i < data.number_of_vertices; ++i) {
-        int r = random_integer(0, data.number_of_vertices - i - 1);
+        int r = std::uniform_int_distribution<int>(0, data.number_of_vertices - i - 1)(data.generator);
         gene[i] = data.remaining[r];
         data.remaining[r] = data.remaining[data.number_of_vertices - i - 1];
     }
@@ -1428,7 +1266,7 @@ void set_ab_cycle(
     while (data.number_of_unbranched != 0) {
         if (data.start_new_trace == 1) {
             data.position_current = 0;
-            data.random_pick = rand() % data.number_of_unbranched;
+            data.random_pick = std::uniform_int_distribution<int>(0, data.number_of_unbranched - 1)(data.generator);
             data.trace_start = data.unbranched[data.random_pick];
             data.first_visit_position[data.trace_start] = data.position_current;
             data.route[data.position_current] = data.trace_start;
@@ -1447,7 +1285,7 @@ void set_ab_cycle(
                 data.trace_current_city = data.near_data[data.trace_previous_city][data.position_current % 2 + 1];
                 break;
             case 2:
-                data.random_pick = rand() % 2;
+                data.random_pick = std::uniform_int_distribution<int>(0, 1)(data.generator);
                 data.trace_current_city = data.near_data[data.trace_previous_city][data.position_current % 2 + 1 + 2 * data.random_pick];
                 if (data.random_pick == 0)
                     std::swap(data.near_data[data.trace_previous_city][data.position_current % 2 + 1], data.near_data[data.trace_previous_city][data.position_current % 2 + 3]);
@@ -1530,7 +1368,7 @@ void set_ab_cycle(
     }
     while (data.number_of_branching != 0) {
         data.position_current = 0;
-        data.random_pick = rand() % data.number_of_branching;
+        data.random_pick = std::uniform_int_distribution<int>(0, data.number_of_branching - 1)(data.generator);
         data.trace_start = data.branching[data.random_pick];
         data.route[data.position_current] = data.trace_start;
         data.trace_current_city = data.trace_start;
@@ -1856,7 +1694,7 @@ void make_complete_sol(
             near_search_limit = 50;
             goto RESTART;
         } else if (best_vertex_id_3 == -1 && near_search_limit == 50) {
-            int random_center_index = rand() % (data.number_of_elements_in_center_unit - 1);
+            int random_center_index = std::uniform_int_distribution<int>(0, data.number_of_elements_in_center_unit - 2)(data.generator);
             vertex_id_1 = data.list_of_center_unit[random_center_index];
             vertex_id_2 = data.list_of_center_unit[random_center_index + 1];
             for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
@@ -1948,7 +1786,9 @@ void make_unit(
         data.link_b_position[0][0] = data.number_of_vertices - 1;
     }
 
-    sort_ascending(data.segment_position_list, data.number_of_segment_positions);
+    std::sort(
+            data.segment_position_list.begin(),
+            data.segment_position_list.begin() + data.number_of_segment_positions);
     data.number_of_segments = data.number_of_segment_positions;
     for (int s = 0; s < data.number_of_segments - 1; ++s) {
         data.segment[s][0] = data.segment_position_list[s];
@@ -2486,7 +2326,7 @@ void search_eset(
                 delete_ab(data, selected_ab_cycle);
             }
 
-            data.moved_ab_cycle[selected_ab_cycle] = iteration + random_integer(1, data.t_max);
+            data.moved_ab_cycle[selected_ab_cycle] = iteration + std::uniform_int_distribution<int>(1, data.t_max)(data.generator);
 
             data.best_number_of_e_edges = data.number_of_e_edges;
 
@@ -2502,7 +2342,7 @@ void search_eset(
             } else if (non_tabu_change == -1) {
                 delete_ab(data, selected_ab_cycle_non_tabu);
             }
-            data.moved_ab_cycle[selected_ab_cycle_non_tabu] = iteration + random_integer(1, data.t_max);
+            data.moved_ab_cycle[selected_ab_cycle_non_tabu] = iteration + std::uniform_int_distribution<int>(1, data.t_max)(data.generator);
         }
         if (improving_change == 0)
             ++stagnation;
@@ -2537,11 +2377,20 @@ void run_cross(
     }
 
     if (data.eset_strategy == 1) { // Single-AB
-        random_permutation(data.permutation, data.number_of_ab_cycles, data.number_of_ab_cycles);
+        std::iota(data.permutation.begin(), data.permutation.begin() + data.number_of_ab_cycles, 0);
+        std::shuffle(data.permutation.begin(), data.permutation.begin() + data.number_of_ab_cycles, data.generator);
     } else if (data.eset_strategy == 2) { // Block2
         for (int k = 0; k < data.number_of_ab_cycles; ++k)
             data.number_of_elements_in_ab_cycle[k] = data.ab_cycle[k][0];
-        sort_indices_descending(data.number_of_elements_in_ab_cycle, data.number_of_ab_cycles, data.permutation, data.number_of_ab_cycles);
+        std::iota(data.permutation.begin(), data.permutation.begin() + data.number_of_ab_cycles, 0);
+        std::stable_sort(
+                data.permutation.begin(),
+                data.permutation.begin() + data.number_of_ab_cycles,
+                [&data](int ab_cycle_id_1, int ab_cycle_id_2)
+                {
+                    return data.number_of_elements_in_ab_cycle[ab_cycle_id_1]
+                        > data.number_of_elements_in_ab_cycle[ab_cycle_id_2];
+                });
     }
     data.number_of_generated_children = 0;
     best_point = 0.0;
@@ -2560,7 +2409,7 @@ void run_cross(
                     data.ab_cycle_in_eset[data.number_of_ab_cycles_in_eset++] = s;
                 } else {
                     if (data.weight_rr[center_ab][s] > 0 && data.ab_cycle[s][0] < data.ab_cycle[center_ab][0]) {
-                        if (rand() % 2 == 0)
+                        if (std::uniform_int_distribution<int>(0, 1)(data.generator) == 0)
                             data.ab_cycle_in_eset[data.number_of_ab_cycles_in_eset++] = s;
                     }
                 }
@@ -2752,7 +2601,8 @@ template <typename Distances>
 void select_for_mating(
         LocalSearchData<Distances>& data)
 {
-    random_permutation(data.index_for_mating, data.population_size, data.population_size);
+    std::iota(data.index_for_mating.begin(), data.index_for_mating.begin() + data.population_size, 0);
+    std::shuffle(data.index_for_mating.begin(), data.index_for_mating.begin() + data.population_size, data.generator);
     data.index_for_mating[data.population_size] = data.index_for_mating[0];
 }
 
@@ -2800,14 +2650,6 @@ const Output local_search(
     algorithm_formatter.print_header();
 
     VertexId number_of_vertices = instance.number_of_vertices();
-
-    // The population/local-search RNG is seeded here (matching what
-    // 'InitURandom(seed)' did in the original vendored code); the sort/RNG
-    // helper objects the original code lazily allocated as process-wide
-    // globals ('tRand'/'tSort') held no state of their own, so this
-    // integration replaced them with plain functions ('random_*'/'sort_*'
-    // above) instead of carrying that non-reentrancy hazard forward.
-    seed_random(parameters.seed);
 
     LocalSearchData<Distances> data(distances, instance, parameters, output, algorithm_formatter, number_of_vertices);
     init(data, parameters.population_size, parameters.number_of_children);

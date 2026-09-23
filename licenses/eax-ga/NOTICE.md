@@ -74,13 +74,16 @@ array was replaced by `std::vector`/`std::array`, with the two-phase
 `TRandom`/`tRand` and `TSort`/`tSort` — two lazily-allocated global-pointer
 singletons wrapping the C `rand()` function and a handful of stateless sort
 routines — held no data members of their own, so they were replaced outright
-by plain functions (`random_integer`, `random_permutation`, `sort_ascending`,
-etc.), removing the process-wide global mutable state and the non-reentrancy
-hazard around `InitSort()` that a comment in this file used to document
-(`tSort` staying null until the GA reached a "Block2" eset stage, which only
-small/quick-converging instances never hit). `InitURandom`/`InitSort`
-themselves are gone; the equivalent seeding is `seed_random(seed)`, called
-once from `local_search()`.
+by the standard library, removing the process-wide global mutable state and the
+non-reentrancy hazard around `InitSort()` that a comment in this file used to
+document (`tSort` staying null until the GA reached a "Block2" eset stage,
+which only small/quick-converging instances never hit). Random numbers are now
+drawn from a `std::mt19937_64` owned by `LocalSearchData` and seeded with
+`LocalSearchParameters::seed` (`std::uniform_int_distribution`,
+`std::shuffle`), and sorting uses `std::sort`/`std::stable_sort`.
+`InitURandom`/`InitSort` themselves are gone. As a consequence, the sequence
+of random numbers, and hence the tours found for a given seed, differ from the
+original's.
 
 The following genuinely dead code (unreachable from `local_search()`, left over from
 the original's un-vendored interactive `main.cpp` driver) was removed:
