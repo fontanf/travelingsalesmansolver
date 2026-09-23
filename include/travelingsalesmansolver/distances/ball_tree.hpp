@@ -15,7 +15,16 @@ public:
     /** Constructor. */
     BallTree(const Distances& distances);
 
-    /** Get the k nearest neighbors of a point. */
+    /**
+     * Get the k nearest neighbors of a point (excluding the point itself),
+     * sorted by increasing distance.
+     *
+     * The search relies on the triangle inequality; if the distances don't
+     * satisfy it, the returned neighbors are only approximate.
+     *
+     * Fewer than k vertices are returned if the instance has fewer than k + 1
+     * vertices.
+     */
     std::vector<VertexId> nearest_neighbors(
             VertexId vertex_id,
             VertexId number_of_neighbors);
