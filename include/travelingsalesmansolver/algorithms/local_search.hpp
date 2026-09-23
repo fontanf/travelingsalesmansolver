@@ -9,7 +9,6 @@
 #include <cmath>
 #include <cstdlib>
 #include <limits>
-#include <memory>
 #include <utility>
 #include <vector>
 
@@ -568,19 +567,23 @@ template <typename Distances>
 void compute_near_cities(
         LocalSearchData<Distances>& data)
 {
-    // Only build a ball tree if it is worth it, i.e. if some vertices are
-    // left out of the nearest neighbors lists.
-    std::unique_ptr<BallTree> ball_tree;
-    if (data.number_of_near_cities < data.number_of_vertices - 1)
-        ball_tree = std::make_unique<BallTree>(data.instance.distances());
-
-    for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
-        std::vector<VertexId> neighbor_ids;
-        if (ball_tree != nullptr) {
-            neighbor_ids = ball_tree->nearest_neighbors(
+    if (data.number_of_near_cities < data.number_of_vertices - 1) {
+        // Some vertices are left out of the nearest neighbors lists: use a
+        // ball tree.
+        BallTree ball_tree(data.instance.distances());
+        for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
+            std::vector<VertexId> neighbor_ids = ball_tree.nearest_neighbors(
                     vertex_id,
                     data.number_of_near_cities);
-        } else {
+            data.near_cities[vertex_id][0] = vertex_id;
+            for (int k = 1; k <= data.number_of_near_cities; ++k)
+                data.near_cities[vertex_id][k] = neighbor_ids[k - 1];
+        }
+    } else {
+        // All the other vertices are in the nearest neighbors lists: sort them
+        // by distance.
+        for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
+            std::vector<VertexId> neighbor_ids;
             for (VertexId other_vertex_id = 0; other_vertex_id < data.number_of_vertices; ++other_vertex_id)
                 if (other_vertex_id != vertex_id)
                     neighbor_ids.push_back(other_vertex_id);
@@ -592,11 +595,10 @@ void compute_near_cities(
                         return data.distances.distance(vertex_id, vertex_id_1)
                             < data.distances.distance(vertex_id, vertex_id_2);
                     });
+            data.near_cities[vertex_id][0] = vertex_id;
+            for (int k = 1; k <= data.number_of_near_cities; ++k)
+                data.near_cities[vertex_id][k] = neighbor_ids[k - 1];
         }
-
-        data.near_cities[vertex_id][0] = vertex_id;
-        for (int k = 1; k <= data.number_of_near_cities; ++k)
-            data.near_cities[vertex_id][k] = neighbor_ids[k - 1];
     }
 }
 
