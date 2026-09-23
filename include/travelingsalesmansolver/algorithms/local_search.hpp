@@ -95,6 +95,115 @@ struct Individual
 };
 
 /**
+ * Number of occurrences of each directed edge across the population.
+ *
+ * Only the edges whose frequency has been modified are stored, in an
+ * open-addressing hash table, which requires memory proportional to the number
+ * of distinct edges met rather than to the square of the number of vertices.
+ */
+class EdgeFrequencies
+{
+
+public:
+
+    /** Constructor. */
+    EdgeFrequencies(VertexId number_of_vertices = 0):
+        number_of_vertices_(number_of_vertices),
+        entries_(initial_capacity, {-1, 0}) { }
+
+    /** Get the frequency of the edge from 'vertex_id_1' to 'vertex_id_2'. */
+    int get(
+            VertexId vertex_id_1,
+            VertexId vertex_id_2) const
+    {
+        int64_t key = this->key(vertex_id_1, vertex_id_2);
+        for (std::size_t pos = hash(key); ; pos = (pos + 1) & (entries_.size() - 1)) {
+            if (entries_[pos].key == key)
+                return entries_[pos].frequency;
+            if (entries_[pos].key == -1)
+                return 0;
+        }
+    }
+
+    /** Add 'delta' to the frequency of the edge from 'vertex_id_1' to 'vertex_id_2'. */
+    void add(
+            VertexId vertex_id_1,
+            VertexId vertex_id_2,
+            int delta)
+    {
+        int64_t key = this->key(vertex_id_1, vertex_id_2);
+        for (std::size_t pos = hash(key); ; pos = (pos + 1) & (entries_.size() - 1)) {
+            if (entries_[pos].key == key) {
+                entries_[pos].frequency += delta;
+                return;
+            }
+            if (entries_[pos].key == -1) {
+                entries_[pos] = {key, delta};
+                ++number_of_entries_;
+                if (2 * number_of_entries_ > entries_.size())
+                    grow();
+                return;
+            }
+        }
+    }
+
+    /** Reset all frequencies to 0. */
+    void clear()
+    {
+        std::fill(entries_.begin(), entries_.end(), Entry{-1, 0});
+        number_of_entries_ = 0;
+    }
+
+private:
+
+    struct Entry
+    {
+        int64_t key;
+        int frequency;
+
+        bool operator==(const Entry& entry) const
+        {
+            return key == entry.key && frequency == entry.frequency;
+        }
+    };
+
+    static constexpr std::size_t initial_capacity = 1 << 10;
+
+    int64_t key(
+            VertexId vertex_id_1,
+            VertexId vertex_id_2) const
+    {
+        return (int64_t)vertex_id_1 * number_of_vertices_ + vertex_id_2;
+    }
+
+    std::size_t hash(int64_t key) const
+    {
+        return ((uint64_t)key * 0x9E3779B97F4A7C15ull >> 32) & (entries_.size() - 1);
+    }
+
+    void grow()
+    {
+        std::vector<Entry> old_entries(2 * entries_.size(), Entry{-1, 0});
+        std::swap(old_entries, entries_);
+        for (const Entry& entry: old_entries) {
+            if (entry.key == -1)
+                continue;
+            std::size_t pos = hash(entry.key);
+            while (entries_[pos].key != -1)
+                pos = (pos + 1) & (entries_.size() - 1);
+            entries_[pos] = entry;
+        }
+    }
+
+    VertexId number_of_vertices_;
+
+    std::vector<Entry> entries_;
+
+    std::size_t number_of_entries_ = 0;
+
+};
+
+/**
  * All mutable working state for the EAX genetic algorithm, shared by every
  * free function below.
  *
@@ -326,7 +435,7 @@ struct LocalSearchData
     long int accumulated_number_of_children = 0;
 
     /** Edge frequency across the population. */
-    std::vector<std::vector<int>> edge_frequency;
+    EdgeFrequencies edge_frequency;
 
     /** Average tour length in the population. */
     double average_value = 0.0;
@@ -561,7 +670,7 @@ void init(
     data.number_of_children = number_of_children;
     data.population = std::vector<Individual>(population_size, Individual(number_of_vertices));
     data.best_individual = Individual(number_of_vertices);
-    data.edge_frequency = std::vector<std::vector<int>>(number_of_vertices, std::vector<int>(number_of_vertices));
+    data.edge_frequency = EdgeFrequencies(number_of_vertices);
     data.index_for_mating.resize(population_size + 1);
 }
 
@@ -1933,10 +2042,10 @@ void increment_edge_freq(
             blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
             blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
 
-            ++data.edge_frequency[red_vertex_id_1][blue_vertex_id_1];
-            --data.edge_frequency[red_vertex_id_1][red_vertex_id_2];
-            --data.edge_frequency[red_vertex_id_2][red_vertex_id_1];
-            ++data.edge_frequency[red_vertex_id_2][blue_vertex_id_2];
+            data.edge_frequency.add(red_vertex_id_1, blue_vertex_id_1, 1);
+            data.edge_frequency.add(red_vertex_id_1, red_vertex_id_2, -1);
+            data.edge_frequency.add(red_vertex_id_2, red_vertex_id_1, -1);
+            data.edge_frequency.add(red_vertex_id_2, blue_vertex_id_2, 1);
         }
     }
     for (int s = 0; s < data.number_of_best_modified_edges; ++s) {
@@ -1945,14 +2054,14 @@ void increment_edge_freq(
         vertex_id_3 = data.best_modified_edge[s][2];
         vertex_id_4 = data.best_modified_edge[s][3];
 
-        --data.edge_frequency[vertex_id_1][vertex_id_2];
-        --data.edge_frequency[vertex_id_3][vertex_id_4];
-        ++data.edge_frequency[vertex_id_1][vertex_id_3];
-        ++data.edge_frequency[vertex_id_2][vertex_id_4];
-        --data.edge_frequency[vertex_id_2][vertex_id_1];
-        --data.edge_frequency[vertex_id_4][vertex_id_3];
-        ++data.edge_frequency[vertex_id_3][vertex_id_1];
-        ++data.edge_frequency[vertex_id_4][vertex_id_2];
+        data.edge_frequency.add(vertex_id_1, vertex_id_2, -1);
+        data.edge_frequency.add(vertex_id_3, vertex_id_4, -1);
+        data.edge_frequency.add(vertex_id_1, vertex_id_3, 1);
+        data.edge_frequency.add(vertex_id_2, vertex_id_4, 1);
+        data.edge_frequency.add(vertex_id_2, vertex_id_1, -1);
+        data.edge_frequency.add(vertex_id_4, vertex_id_3, -1);
+        data.edge_frequency.add(vertex_id_3, vertex_id_1, 1);
+        data.edge_frequency.add(vertex_id_4, vertex_id_2, 1);
     }
 }
 
@@ -1982,15 +2091,15 @@ int calc_adaptive_loss(
             blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
             blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
 
-            loss -= (data.edge_frequency[red_vertex_id_1][red_vertex_id_2] - 1);
-            loss -= (data.edge_frequency[red_vertex_id_2][red_vertex_id_1] - 1);
-            loss += data.edge_frequency[red_vertex_id_2][blue_vertex_id_2];
-            loss += data.edge_frequency[blue_vertex_id_2][red_vertex_id_2];
+            loss -= (data.edge_frequency.get(red_vertex_id_1, red_vertex_id_2) - 1);
+            loss -= (data.edge_frequency.get(red_vertex_id_2, red_vertex_id_1) - 1);
+            loss += data.edge_frequency.get(red_vertex_id_2, blue_vertex_id_2);
+            loss += data.edge_frequency.get(blue_vertex_id_2, red_vertex_id_2);
 
-            --data.edge_frequency[red_vertex_id_1][red_vertex_id_2];
-            --data.edge_frequency[red_vertex_id_2][red_vertex_id_1];
-            ++data.edge_frequency[red_vertex_id_2][blue_vertex_id_2];
-            ++data.edge_frequency[blue_vertex_id_2][red_vertex_id_2];
+            data.edge_frequency.add(red_vertex_id_1, red_vertex_id_2, -1);
+            data.edge_frequency.add(red_vertex_id_2, red_vertex_id_1, -1);
+            data.edge_frequency.add(red_vertex_id_2, blue_vertex_id_2, 1);
+            data.edge_frequency.add(blue_vertex_id_2, red_vertex_id_2, 1);
         }
     }
     for (int s = 0; s < data.number_of_modified_edges; ++s) {
@@ -1999,25 +2108,25 @@ int calc_adaptive_loss(
         vertex_id_3 = data.modified_edge[s][2];
         vertex_id_4 = data.modified_edge[s][3];
 
-        loss -= (data.edge_frequency[vertex_id_1][vertex_id_2] - 1);
-        loss -= (data.edge_frequency[vertex_id_2][vertex_id_1] - 1);
-        loss -= (data.edge_frequency[vertex_id_3][vertex_id_4] - 1);
-        loss -= (data.edge_frequency[vertex_id_4][vertex_id_3] - 1);
+        loss -= (data.edge_frequency.get(vertex_id_1, vertex_id_2) - 1);
+        loss -= (data.edge_frequency.get(vertex_id_2, vertex_id_1) - 1);
+        loss -= (data.edge_frequency.get(vertex_id_3, vertex_id_4) - 1);
+        loss -= (data.edge_frequency.get(vertex_id_4, vertex_id_3) - 1);
 
-        loss += data.edge_frequency[vertex_id_1][vertex_id_3];
-        loss += data.edge_frequency[vertex_id_3][vertex_id_1];
-        loss += data.edge_frequency[vertex_id_2][vertex_id_4];
-        loss += data.edge_frequency[vertex_id_4][vertex_id_2];
+        loss += data.edge_frequency.get(vertex_id_1, vertex_id_3);
+        loss += data.edge_frequency.get(vertex_id_3, vertex_id_1);
+        loss += data.edge_frequency.get(vertex_id_2, vertex_id_4);
+        loss += data.edge_frequency.get(vertex_id_4, vertex_id_2);
 
-        --data.edge_frequency[vertex_id_1][vertex_id_2];
-        --data.edge_frequency[vertex_id_2][vertex_id_1];
-        --data.edge_frequency[vertex_id_3][vertex_id_4];
-        --data.edge_frequency[vertex_id_4][vertex_id_3];
+        data.edge_frequency.add(vertex_id_1, vertex_id_2, -1);
+        data.edge_frequency.add(vertex_id_2, vertex_id_1, -1);
+        data.edge_frequency.add(vertex_id_3, vertex_id_4, -1);
+        data.edge_frequency.add(vertex_id_4, vertex_id_3, -1);
 
-        ++data.edge_frequency[vertex_id_1][vertex_id_3];
-        ++data.edge_frequency[vertex_id_3][vertex_id_1];
-        ++data.edge_frequency[vertex_id_2][vertex_id_4];
-        ++data.edge_frequency[vertex_id_4][vertex_id_2];
+        data.edge_frequency.add(vertex_id_1, vertex_id_3, 1);
+        data.edge_frequency.add(vertex_id_3, vertex_id_1, 1);
+        data.edge_frequency.add(vertex_id_2, vertex_id_4, 1);
+        data.edge_frequency.add(vertex_id_4, vertex_id_2, 1);
     }
     for (int s = 0; s < data.number_of_applied_cycles; ++s) {
         jnum = data.applied_cycle[s];
@@ -2032,10 +2141,10 @@ int calc_adaptive_loss(
             blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
             blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
 
-            ++data.edge_frequency[red_vertex_id_1][red_vertex_id_2];
-            ++data.edge_frequency[red_vertex_id_2][red_vertex_id_1];
-            --data.edge_frequency[red_vertex_id_2][blue_vertex_id_2];
-            --data.edge_frequency[blue_vertex_id_2][red_vertex_id_2];
+            data.edge_frequency.add(red_vertex_id_1, red_vertex_id_2, 1);
+            data.edge_frequency.add(red_vertex_id_2, red_vertex_id_1, 1);
+            data.edge_frequency.add(red_vertex_id_2, blue_vertex_id_2, -1);
+            data.edge_frequency.add(blue_vertex_id_2, red_vertex_id_2, -1);
         }
     }
     for (int s = 0; s < data.number_of_modified_edges; ++s) {
@@ -2044,15 +2153,15 @@ int calc_adaptive_loss(
         vertex_id_3 = data.modified_edge[s][2];
         vertex_id_4 = data.modified_edge[s][3];
 
-        ++data.edge_frequency[vertex_id_1][vertex_id_2];
-        ++data.edge_frequency[vertex_id_2][vertex_id_1];
-        ++data.edge_frequency[vertex_id_3][vertex_id_4];
-        ++data.edge_frequency[vertex_id_4][vertex_id_3];
+        data.edge_frequency.add(vertex_id_1, vertex_id_2, 1);
+        data.edge_frequency.add(vertex_id_2, vertex_id_1, 1);
+        data.edge_frequency.add(vertex_id_3, vertex_id_4, 1);
+        data.edge_frequency.add(vertex_id_4, vertex_id_3, 1);
 
-        --data.edge_frequency[vertex_id_1][vertex_id_3];
-        --data.edge_frequency[vertex_id_3][vertex_id_1];
-        --data.edge_frequency[vertex_id_2][vertex_id_4];
-        --data.edge_frequency[vertex_id_4][vertex_id_2];
+        data.edge_frequency.add(vertex_id_1, vertex_id_3, -1);
+        data.edge_frequency.add(vertex_id_3, vertex_id_1, -1);
+        data.edge_frequency.add(vertex_id_2, vertex_id_4, -1);
+        data.edge_frequency.add(vertex_id_4, vertex_id_2, -1);
     }
     return int(loss / 2);
 }
@@ -2083,21 +2192,21 @@ double calc_entropy_loss(
             blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
             blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
 
-            h1 = (double)(data.edge_frequency[red_vertex_id_1][red_vertex_id_2] - 1) / (double)data.population_size;
-            h2 = (double)(data.edge_frequency[red_vertex_id_1][red_vertex_id_2]) / (double)data.population_size;
-            if (data.edge_frequency[red_vertex_id_1][red_vertex_id_2] - 1 != 0)
+            h1 = (double)(data.edge_frequency.get(red_vertex_id_1, red_vertex_id_2) - 1) / (double)data.population_size;
+            h2 = (double)(data.edge_frequency.get(red_vertex_id_1, red_vertex_id_2)) / (double)data.population_size;
+            if (data.edge_frequency.get(red_vertex_id_1, red_vertex_id_2) - 1 != 0)
                 loss -= h1 * log(h1);
             loss += h2 * log(h2);
-            --data.edge_frequency[red_vertex_id_1][red_vertex_id_2];
-            --data.edge_frequency[red_vertex_id_2][red_vertex_id_1];
+            data.edge_frequency.add(red_vertex_id_1, red_vertex_id_2, -1);
+            data.edge_frequency.add(red_vertex_id_2, red_vertex_id_1, -1);
 
-            h1 = (double)(data.edge_frequency[red_vertex_id_2][blue_vertex_id_2] + 1) / (double)data.population_size;
-            h2 = (double)(data.edge_frequency[red_vertex_id_2][blue_vertex_id_2]) / (double)data.population_size;
+            h1 = (double)(data.edge_frequency.get(red_vertex_id_2, blue_vertex_id_2) + 1) / (double)data.population_size;
+            h2 = (double)(data.edge_frequency.get(red_vertex_id_2, blue_vertex_id_2)) / (double)data.population_size;
             loss -= h1 * log(h1);
-            if (data.edge_frequency[red_vertex_id_2][blue_vertex_id_2] != 0)
+            if (data.edge_frequency.get(red_vertex_id_2, blue_vertex_id_2) != 0)
                 loss += h2 * log(h2);
-            ++data.edge_frequency[red_vertex_id_2][blue_vertex_id_2];
-            ++data.edge_frequency[blue_vertex_id_2][red_vertex_id_2];
+            data.edge_frequency.add(red_vertex_id_2, blue_vertex_id_2, 1);
+            data.edge_frequency.add(blue_vertex_id_2, red_vertex_id_2, 1);
         }
     }
 
@@ -2107,37 +2216,37 @@ double calc_entropy_loss(
         vertex_id_3 = data.modified_edge[s][2];
         vertex_id_4 = data.modified_edge[s][3];
 
-        h1 = (double)(data.edge_frequency[vertex_id_1][vertex_id_2] - 1) / (double)data.population_size;
-        h2 = (double)(data.edge_frequency[vertex_id_1][vertex_id_2]) / (double)data.population_size;
-        if (data.edge_frequency[vertex_id_1][vertex_id_2] - 1 != 0)
+        h1 = (double)(data.edge_frequency.get(vertex_id_1, vertex_id_2) - 1) / (double)data.population_size;
+        h2 = (double)(data.edge_frequency.get(vertex_id_1, vertex_id_2)) / (double)data.population_size;
+        if (data.edge_frequency.get(vertex_id_1, vertex_id_2) - 1 != 0)
             loss -= h1 * log(h1);
         loss += h2 * log(h2);
-        --data.edge_frequency[vertex_id_1][vertex_id_2];
-        --data.edge_frequency[vertex_id_2][vertex_id_1];
+        data.edge_frequency.add(vertex_id_1, vertex_id_2, -1);
+        data.edge_frequency.add(vertex_id_2, vertex_id_1, -1);
 
-        h1 = (double)(data.edge_frequency[vertex_id_3][vertex_id_4] - 1) / (double)data.population_size;
-        h2 = (double)(data.edge_frequency[vertex_id_3][vertex_id_4]) / (double)data.population_size;
-        if (data.edge_frequency[vertex_id_3][vertex_id_4] - 1 != 0)
+        h1 = (double)(data.edge_frequency.get(vertex_id_3, vertex_id_4) - 1) / (double)data.population_size;
+        h2 = (double)(data.edge_frequency.get(vertex_id_3, vertex_id_4)) / (double)data.population_size;
+        if (data.edge_frequency.get(vertex_id_3, vertex_id_4) - 1 != 0)
             loss -= h1 * log(h1);
         loss += h2 * log(h2);
-        --data.edge_frequency[vertex_id_3][vertex_id_4];
-        --data.edge_frequency[vertex_id_4][vertex_id_3];
+        data.edge_frequency.add(vertex_id_3, vertex_id_4, -1);
+        data.edge_frequency.add(vertex_id_4, vertex_id_3, -1);
 
-        h1 = (double)(data.edge_frequency[vertex_id_1][vertex_id_3] + 1) / (double)data.population_size;
-        h2 = (double)(data.edge_frequency[vertex_id_1][vertex_id_3]) / (double)data.population_size;
+        h1 = (double)(data.edge_frequency.get(vertex_id_1, vertex_id_3) + 1) / (double)data.population_size;
+        h2 = (double)(data.edge_frequency.get(vertex_id_1, vertex_id_3)) / (double)data.population_size;
         loss -= h1 * log(h1);
-        if (data.edge_frequency[vertex_id_1][vertex_id_3] != 0)
+        if (data.edge_frequency.get(vertex_id_1, vertex_id_3) != 0)
             loss += h2 * log(h2);
-        ++data.edge_frequency[vertex_id_1][vertex_id_3];
-        ++data.edge_frequency[vertex_id_3][vertex_id_1];
+        data.edge_frequency.add(vertex_id_1, vertex_id_3, 1);
+        data.edge_frequency.add(vertex_id_3, vertex_id_1, 1);
 
-        h1 = (double)(data.edge_frequency[vertex_id_2][vertex_id_4] + 1) / (double)data.population_size;
-        h2 = (double)(data.edge_frequency[vertex_id_2][vertex_id_4]) / (double)data.population_size;
+        h1 = (double)(data.edge_frequency.get(vertex_id_2, vertex_id_4) + 1) / (double)data.population_size;
+        h2 = (double)(data.edge_frequency.get(vertex_id_2, vertex_id_4)) / (double)data.population_size;
         loss -= h1 * log(h1);
-        if (data.edge_frequency[vertex_id_2][vertex_id_4] != 0)
+        if (data.edge_frequency.get(vertex_id_2, vertex_id_4) != 0)
             loss += h2 * log(h2);
-        ++data.edge_frequency[vertex_id_2][vertex_id_4];
-        ++data.edge_frequency[vertex_id_4][vertex_id_2];
+        data.edge_frequency.add(vertex_id_2, vertex_id_4, 1);
+        data.edge_frequency.add(vertex_id_4, vertex_id_2, 1);
     }
     loss = -loss;
 
@@ -2157,10 +2266,10 @@ double calc_entropy_loss(
             blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
             blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
 
-            ++data.edge_frequency[red_vertex_id_1][red_vertex_id_2];
-            ++data.edge_frequency[red_vertex_id_2][red_vertex_id_1];
-            --data.edge_frequency[red_vertex_id_2][blue_vertex_id_2];
-            --data.edge_frequency[blue_vertex_id_2][red_vertex_id_2];
+            data.edge_frequency.add(red_vertex_id_1, red_vertex_id_2, 1);
+            data.edge_frequency.add(red_vertex_id_2, red_vertex_id_1, 1);
+            data.edge_frequency.add(red_vertex_id_2, blue_vertex_id_2, -1);
+            data.edge_frequency.add(blue_vertex_id_2, red_vertex_id_2, -1);
         }
     }
     for (int s = 0; s < data.number_of_modified_edges; ++s) {
@@ -2169,15 +2278,15 @@ double calc_entropy_loss(
         vertex_id_3 = data.modified_edge[s][2];
         vertex_id_4 = data.modified_edge[s][3];
 
-        ++data.edge_frequency[vertex_id_1][vertex_id_2];
-        ++data.edge_frequency[vertex_id_2][vertex_id_1];
-        ++data.edge_frequency[vertex_id_3][vertex_id_4];
-        ++data.edge_frequency[vertex_id_4][vertex_id_3];
+        data.edge_frequency.add(vertex_id_1, vertex_id_2, 1);
+        data.edge_frequency.add(vertex_id_2, vertex_id_1, 1);
+        data.edge_frequency.add(vertex_id_3, vertex_id_4, 1);
+        data.edge_frequency.add(vertex_id_4, vertex_id_3, 1);
 
-        --data.edge_frequency[vertex_id_1][vertex_id_3];
-        --data.edge_frequency[vertex_id_3][vertex_id_1];
-        --data.edge_frequency[vertex_id_2][vertex_id_4];
-        --data.edge_frequency[vertex_id_4][vertex_id_2];
+        data.edge_frequency.add(vertex_id_1, vertex_id_3, -1);
+        data.edge_frequency.add(vertex_id_3, vertex_id_1, -1);
+        data.edge_frequency.add(vertex_id_2, vertex_id_4, -1);
+        data.edge_frequency.add(vertex_id_4, vertex_id_2, -1);
     }
     return loss;
 }
@@ -2581,16 +2690,14 @@ template <typename Distances>
 void compute_edge_frequencies(
         LocalSearchData<Distances>& data)
 {
-    for (VertexId vertex_id_1 = 0; vertex_id_1 < data.number_of_vertices; ++vertex_id_1)
-        for (VertexId vertex_id_2 = 0; vertex_id_2 < data.number_of_vertices; ++vertex_id_2)
-            data.edge_frequency[vertex_id_1][vertex_id_2] = 0;
+    data.edge_frequency.clear();
 
     for (int i = 0; i < data.population_size; ++i)
         for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
             VertexId neighbor_vertex_id_1 = data.population[i].neighbors[vertex_id][0];
             VertexId neighbor_vertex_id_2 = data.population[i].neighbors[vertex_id][1];
-            ++data.edge_frequency[vertex_id][neighbor_vertex_id_1];
-            ++data.edge_frequency[vertex_id][neighbor_vertex_id_2];
+            data.edge_frequency.add(vertex_id, neighbor_vertex_id_1, 1);
+            data.edge_frequency.add(vertex_id, neighbor_vertex_id_2, 1);
         }
 }
 }
