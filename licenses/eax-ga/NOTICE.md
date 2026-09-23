@@ -191,12 +191,12 @@ deliberately kept distinct (see `LocalSearchData`'s own comment in
   only show up as quietly worse solutions on harder instances — the same
   general hazard class as the `tSort`/"Block2" non-reentrancy issue
   documented earlier in this file.
-- `KOpt::next_city()`/`previous_city()` (free functions after flattening)
+- `KOpt::next_city()`/`previous_city()` (`next_vertex()`/`previous_vertex()` after flattening)
   vs `Cross::current_city_`/`previous_city_` (AB-cycle trace state) — not
   found by inspection, only by mechanically stripping every member's
   trailing underscore and diffing all four classes' method and field names
   against each other pairwise. `Cross`'s fields became
-  `trace_current_city`/`trace_previous_city` (with `trace_start_` also
+  `trace_current_vertex`/`trace_previous_vertex` (with `trace_start_` also
   renamed to `trace_start` for consistency, though it had no collision).
 
 Fields that were genuinely the same value in multiple classes (all set from
@@ -207,8 +207,8 @@ were merged into one field: `number_of_vertices` (was
 `Cross::population_size_`/`Environment::population_size_`), and the
 nearest-neighbor list size (was `Evaluator::max_near_cities_`/
 `KOpt::max_near_cities_used_`, both hardcoded to `50`) into one file-scope
-`constexpr int max_near_cities`. `Evaluator` itself disappears as a
-sub-object: its fields (`distances`, `near_cities`, `number_of_vertices`)
+`constexpr int max_near_vertices`. `Evaluator` itself disappears as a
+sub-object: its fields (`distances`, `near_vertices`, `number_of_vertices`)
 are now direct fields of `LocalSearchData`, and call sites that used to say
 `evaluator_.distance(a, b)` now say `distance(data, a, b)` via a small
 inline free-function wrapper around `data.distances.distance(a, b)`.
