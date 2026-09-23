@@ -63,7 +63,7 @@ subdirectory for them to live in.
 
 At the same time, every type, method, and member field was renamed to this
 project's conventions (PascalCase types with no `T`-prefix, e.g. `TEnvironment`
--> `Environment`, `TIndi` -> `Individual`, `TCross` -> `Cross`, `TKopt` ->
+-> `Environment`, `TIndi` -> `Individual` (later renamed `LocalSearchSolution`), `TCross` -> `Cross`, `TKopt` ->
 `KOpt`; snake_case methods, e.g. `doIt` -> `run`, `terminationCondition` ->
 `termination_condition`; trailing-underscore private members with no
 `f`-prefix, e.g. `fEvaluator` -> `evaluator_`), and every raw `new[]`/`delete[]`
@@ -164,7 +164,7 @@ Following the same pattern as `local_search_pfss_makespan.cpp` (a single
 operation a free function taking it in place of an implicit `this`), the
 four classes were merged into one `template <typename Distances> struct
 LocalSearchData` plus free functions in the same anonymous namespace.
-`Individual` is unaffected (it was already a plain data holder with no
+`Individual` (now `LocalSearchSolution`) is unaffected (it was already a plain data holder with no
 methods beyond `operator==`, which is unchanged). Unlike
 `local_search_pfss_makespan`'s helpers, these free functions do not take a
 `const Instance&`: they never needed one (distances/near-neighbor lists
@@ -240,5 +240,5 @@ Three methods were unambiguously renamed since, as free functions in one
 shared namespace, they could no longer be disambiguated by class scope:
 `Environment::run()` (the top-level generation loop, called from the
 public `local_search()` entry point) stays plain `run()`; `KOpt::run()`
-(local search on one individual) becomes `run_kopt()`; `Cross::run()`
+(local search on one solution) becomes `run_kopt()`; `Cross::run()`
 (crossover for one mating pair) becomes `run_cross()`.
