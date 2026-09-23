@@ -96,39 +96,12 @@ struct Individual
 
 /**
  * All mutable working state for the EAX genetic algorithm, shared by every
- * free function below in place of the 'Evaluator'/'KOpt'/'Cross'/'Environment'
- * classes this was flattened from.
+ * free function below.
  *
- * A few fields that existed as same-named private members of two different
- * classes were deliberately renamed to avoid silently aliasing two distinct
- * concepts into one field once flattened (each original class kept its own
- * copy of these, so nothing here changes behavior, only the field name):
- * - 'KOpt::number_of_segments_' (current number of segments in the 2-opt
- *   tree representation) -> 'number_of_tree_segments', keeping
- *   'Cross::number_of_segments_' (path segments built while completing a
- *   child tour) as the plain 'number_of_segments'.
- * - 'Cross::max_stagnation_' ("Block2" eset local search stagnation limit,
- *   see 'search_eset()') -> 'eset_max_stagnation', keeping
- *   'Environment::max_stagnation_' (generation-level stage-1 -> stage-2
- *   stagnation limit) as the plain 'max_stagnation'.
- * Additionally, 'Cross::current_city_'/'previous_city_' (AB-cycle trace
- * state) were renamed to 'trace_current_city'/'trace_previous_city' to avoid
- * reading as a call to the free functions 'next_city()'/'previous_city()'
- * below (a collision only exposed once the class-private trailing
- * underscore was dropped).
- *
- * Fields that were genuinely the same value in two or more of the original
- * classes (all ultimately set from the same constructor argument) were
- * unified into one field: 'number_of_vertices' (was
- * 'Evaluator::number_of_vertices'/'KOpt::number_of_vertices_'/
- * 'Cross::number_of_vertices_'), 'population_size' (was
- * 'Cross::population_size_'/'Environment::population_size_'), and the
- * nearest-neighbor list size constant (was 'Evaluator::max_near_cities_'/
- * 'KOpt::max_near_cities_used_', both '50') into the file-scope constant
- * 'max_near_cities' below. 'Evaluator' itself no longer exists as a
- * sub-object: its fields ('distances', 'near_cities', 'number_of_vertices')
- * are now direct fields of 'LocalSearchData', accessed as 'data.distances'
- * instead of through 'evaluator_'.
+ * The fields are grouped by the part of the algorithm using them: instance
+ * data, 2-opt local search, crossover, and generation-level state. The vertex
+ * neighbor lists are stored in 'near_cities' (each vertex followed by its
+ * 'number_of_near_cities' nearest neighbors, see 'max_near_cities').
  */
 template <typename Distances>
 struct LocalSearchData
@@ -143,7 +116,7 @@ struct LocalSearchData
             VertexId number_of_vertices);
 
     ////////////////////////////////////////////////////////////////////////
-    // Instance data (formerly 'Evaluator').
+    // Instance data.
     ////////////////////////////////////////////////////////////////////////
 
     /** Distances between vertices. */
@@ -177,7 +150,7 @@ struct LocalSearchData
     std::vector<std::vector<VertexId>> near_cities;
 
     ////////////////////////////////////////////////////////////////////////
-    // 2-opt local search state (formerly 'KOpt').
+    // 2-opt local search state.
     ////////////////////////////////////////////////////////////////////////
 
     /** For each vertex, the vertices in whose nearest-neighbor list it appears. */
@@ -232,7 +205,7 @@ struct LocalSearchData
     std::vector<VertexId> remaining;
 
     ////////////////////////////////////////////////////////////////////////
-    // Crossover state (formerly 'Cross').
+    // Crossover state.
     ////////////////////////////////////////////////////////////////////////
 
     /** Population size. */
@@ -275,6 +248,7 @@ struct LocalSearchData
 
     // speeds up start
     int number_of_units;
+    /** Number of path segments built while completing a child tour (see 'make_complete_sol()'). */
     int number_of_segments;
     int number_of_segment_positions;
     int number_of_elements_in_center_unit;
@@ -316,13 +290,6 @@ struct LocalSearchData
 
     int number_of_ab_cycles_in_eset;
 
-    /**
-     * NOTE: this is deliberately never written by 'set_parents()' -- see
-     * 'set_parents()''s local 'distance_ab_local' and 'licenses/eax-ga/NOTICE.md'
-     * for why this reproduces a pre-existing upstream bug byte-for-byte.
-     */
-    int distance_ab;
-
     int best_number_of_c_nodes;
     int best_number_of_e_edges;
 
@@ -340,7 +307,7 @@ struct LocalSearchData
     int number_of_generated_children = 0;
 
     ////////////////////////////////////////////////////////////////////////
-    // Genetic algorithm state (formerly 'Environment').
+    // Genetic algorithm state.
     ////////////////////////////////////////////////////////////////////////
 
     /** Number of children generated per generation. */
@@ -489,7 +456,7 @@ void init(
 {
     VertexId number_of_vertices = data.number_of_vertices;
 
-    // Crossover state (formerly Cross's constructor).
+    // Crossover state.
     data.population_size = population_size;
     data.max_number_of_ab_cycles = 2000; // sets the maximum number of ab cycle
 
@@ -590,7 +557,7 @@ void init(
     data.moved_ab_cycle.resize(number_of_vertices);
     data.ab_cycle_in_eset.resize(data.max_number_of_ab_cycles);
 
-    // Genetic algorithm state (formerly Environment's constructor).
+    // Genetic algorithm state.
     data.number_of_children = number_of_children;
     data.population = std::vector<Individual>(population_size, Individual(number_of_vertices));
     data.best_individual = Individual(number_of_vertices);
@@ -1502,14 +1469,6 @@ void set_parents(
 {
     set_ab_cycle(data, parent1, parent2, number_of_kids);
 
-    // NOTE: this local is deliberately never written back to 'data.distance_ab'
-    // -- this reproduces a pre-existing upstream quirk byte-for-byte: the
-    // field 'data.distance_ab', read later in 'run_cross()' (guarding
-    // '2 * data.best_number_of_e_edges < data.distance_ab'), is never
-    // actually updated by this function, so 'run_cross()' always sees a
-    // stale value from a previous call (or 0, on the very first call). See
-    // NOTICE.md.
-    int distance_ab_local = 0;
     VertexId start_vertex_id = 0;
     VertexId current_vertex_id = -1;
     VertexId next_vertex_id = start_vertex_id;
@@ -1522,8 +1481,6 @@ void set_parents(
         } else {
             next_vertex_id = parent1.neighbors[current_vertex_id][1];
         }
-        if (parent2.neighbors[current_vertex_id][0] != next_vertex_id && parent2.neighbors[current_vertex_id][1] != next_vertex_id)
-            ++distance_ab_local;
         data.order[i] = current_vertex_id;
         data.inverse_order[current_vertex_id] = i;
     }
@@ -2449,7 +2406,7 @@ void run_cross(
         point = (double)gain / loss;
         child.length = child.length - gain;
 
-        if (best_point < point && (2 * data.best_number_of_e_edges < data.distance_ab || child.length != parent2.length)) {
+        if (best_point < point && child.length != parent2.length) {
             best_point = point;
             best_gain = gain;
             improved = true;

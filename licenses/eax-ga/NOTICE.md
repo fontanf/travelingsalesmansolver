@@ -97,19 +97,12 @@ the original's un-vendored interactive `main.cpp` driver) was removed:
 the original's own comment if a city's inverse near-list ever exceeded 500
 entries) became unbounded `std::vector`s.
 
-One pre-existing behavior was deliberately left unchanged despite looking
-like a bug: `Cross::set_parents()` (formerly `TCross::setParents()`) computes
-a local `int fDisAB = 0` that shadows the class member of the same name, so
-the member is never actually updated by `set_parents()` — `Cross::run()`
-(formerly `doIt()`)'s later read of that member (`2 * best_number_of_e_edges_
-< distance_ab_`) sees a stale/previous-call value rather than the freshly
-computed one. This looks like an upstream bug (a missing `this->`), but per
-this rewrite's scope, behavior was preserved exactly rather than fixed:
-`set_parents()`'s local is named `distance_ab_local` (distinct from the
-member `distance_ab_`) precisely so the never-written-back member is
-textually obvious rather than hidden behind an identically-named shadow; the
-member itself is still never assigned by `set_parents()`, matching the
-original's behavior byte-for-byte.
+`Cross::set_parents()` (formerly `TCross::setParents()`) computed a local
+`int fDisAB = 0` that shadowed the class member of the same name, so the
+member was never updated and `Cross::run()`'s later read of it
+(`2 * best_number_of_e_edges_ < distance_ab_`) used an uninitialized value.
+The member, the local and that condition were removed; the check on
+`child.length != parent2.length` remains.
 
 A first pass at this rewrite renamed `Cross`'s member fields and its class
 declaration, but left its method *bodies* in the original vendored spacing
@@ -125,8 +118,7 @@ e.g. `ci_` -> `current_city_`, `st_` -> `trace_start_`, `koritsu_many_` ->
 -> `start_new_trace_`, `pr_type_` -> `traversal_type_`). Two more benign
 local/member name collisions found during that pass (`form_ab_cycle()`'s and
 `make_complete_sol()`'s own locals happening to shadow `trace_start_`/
-`current_city_`/`random_pick_` after the first pass's renames, unlike the
-`distance_ab_` case above, self-contained and never read back through the
+`current_city_`/`random_pick_` after the first pass's renames, self-contained and never read back through the
 member) were resolved by giving the locals distinct names entirely. That
 pass deliberately kept the EAX paper's own red/blue-edge notation
 (`r1`/`r2`/`b1`/`b2`, `aa`/`bb`/`a1`/`b1`) as-is.
@@ -250,13 +242,3 @@ shared namespace, they could no longer be disambiguated by class scope:
 public `local_search()` entry point) stays plain `run()`; `KOpt::run()`
 (local search on one individual) becomes `run_kopt()`; `Cross::run()`
 (crossover for one mating pair) becomes `run_cross()`.
-
-Updated to describe the flattened code shape: `set_parents()`'s local that
-reproduces the preserved `distance_ab`/`distance_ab_local` bug (see above)
-no longer "shadows a class member" in the free-function version, since
-there is no implicit `this` to shadow through — it is now more precisely
-described as: the local `distance_ab_local` is computed but never written
-back to `data.distance_ab`, so `run_cross()`'s later read of `data.distance_ab`
-still sees a stale value from a previous call (or 0, on the very first
-call). Behavior is identical; only the description of the mechanism
-changed to match the new code shape.
