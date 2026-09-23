@@ -1142,56 +1142,47 @@ void optimize(
         LocalSearchData<Distances>& data)
 {
     std::fill(data.active.begin(), data.active.end(), 1);
-BEGIN:
-    {
+    while (true) {
+        // Scan the vertices cyclically, starting from a random one, until a
+        // move is applied (in which case the scan restarts from a new random
+        // vertex) or all the vertices have been scanned without finding any.
         VertexId t1_start = std::uniform_int_distribution<int>(0, data.number_of_vertices - 1)(data.generator);
         data.t[1] = t1_start;
-        while (true) {
+        bool move_applied = false;
+        while (!move_applied) {
             data.t[1] = next_vertex(data, data.t[1]);
-            if (data.active[data.t[1]] == 0)
-                goto RETURN;
-            data.reversed = 0;
-            data.t[2] = previous_vertex(data, data.t[1]);
-            for (int num1 = 1; num1 < data.number_of_near_vertices; ++num1) {
-                data.t[4] = data.near_vertices[data.t[1]][num1];
-                data.t[3] = previous_vertex(data, data.t[4]);
-                Distance dis1 = data.distances.distance(data.t[1], data.t[2]) - data.distances.distance(data.t[1], data.t[4]);
-                if (dis1 > 0) {
-                    Distance dis2 = dis1 + data.distances.distance(data.t[3], data.t[4]) - data.distances.distance(data.t[3], data.t[2]);
-                    if (dis2 > 0) {
-                        apply_move(data);
-                        for (int a = 1; a <= 4; ++a)
-                            for (VertexId near_vertex : data.inverse_near_list[data.t[a]])
-                                data.active[near_vertex] = 1;
-                        goto BEGIN;
+            if (data.active[data.t[1]] != 0) {
+                // Look for an improving move, considering both the successor
+                // (reversed == 1) and the predecessor (reversed == 0) of 't[1]'.
+                for (int reversed = 0; reversed < 2 && !move_applied; ++reversed) {
+                    data.reversed = reversed;
+                    data.t[2] = (reversed == 0)?
+                        previous_vertex(data, data.t[1]):
+                        next_vertex(data, data.t[1]);
+                    for (int num1 = 1; num1 < data.number_of_near_vertices; ++num1) {
+                        data.t[4] = data.near_vertices[data.t[1]][num1];
+                        data.t[3] = (reversed == 0)?
+                            previous_vertex(data, data.t[4]):
+                            next_vertex(data, data.t[4]);
+                        Distance dis1 = data.distances.distance(data.t[1], data.t[2]) - data.distances.distance(data.t[1], data.t[4]);
+                        if (dis1 <= 0)
+                            break;
+                        Distance dis2 = dis1 + data.distances.distance(data.t[3], data.t[4]) - data.distances.distance(data.t[3], data.t[2]);
+                        if (dis2 > 0) {
+                            apply_move(data);
+                            for (int a = 1; a <= 4; ++a)
+                                for (VertexId near_vertex : data.inverse_near_list[data.t[a]])
+                                    data.active[near_vertex] = 1;
+                            move_applied = true;
+                            break;
+                        }
                     }
-                } else {
-                    break;
                 }
+                if (!move_applied)
+                    data.active[data.t[1]] = 0;
             }
-            data.reversed = 1;
-            data.t[2] = next_vertex(data, data.t[1]);
-            for (int num1 = 1; num1 < data.number_of_near_vertices; ++num1) {
-                data.t[4] = data.near_vertices[data.t[1]][num1];
-                data.t[3] = next_vertex(data, data.t[4]);
-                Distance dis1 = data.distances.distance(data.t[1], data.t[2]) - data.distances.distance(data.t[1], data.t[4]);
-                if (dis1 > 0) {
-                    Distance dis2 = dis1 + data.distances.distance(data.t[3], data.t[4]) - data.distances.distance(data.t[3], data.t[2]);
-                    if (dis2 > 0) {
-                        apply_move(data);
-                        for (int a = 1; a <= 4; ++a)
-                            for (VertexId near_vertex : data.inverse_near_list[data.t[a]])
-                                data.active[near_vertex] = 1;
-                        goto BEGIN;
-                    }
-                } else {
-                    break;
-                }
-            }
-            data.active[data.t[1]] = 0;
-RETURN:
-            if (data.t[1] == t1_start)
-                break;
+            if (!move_applied && data.t[1] == t1_start)
+                return;
         }
     }
 }
@@ -1370,7 +1361,7 @@ void set_ab_cycle(
                             data.start_appearance_count = 1;
                             form_ab_cycle(data);
                             if (data.flags[1] == 1 && data.number_of_ab_cycles == number_of_kids)
-                                goto RETURN;
+                                return;
 
                             data.start_new_trace = 0;
                             data.cycle_complete = 1;
@@ -1384,7 +1375,7 @@ void set_ab_cycle(
                         data.start_appearance_count = 2;
                         form_ab_cycle(data);
                         if (data.flags[1] == 1 && data.number_of_ab_cycles == number_of_kids)
-                            goto RETURN;
+                            return;
 
                         data.start_new_trace = 1;
                         data.cycle_complete = 1;
@@ -1400,7 +1391,7 @@ void set_ab_cycle(
                         data.start_appearance_count = 1;
                         form_ab_cycle(data);
                         if (data.flags[1] == 1 && data.number_of_ab_cycles == number_of_kids)
-                            goto RETURN;
+                            return;
 
                         data.start_new_trace = 0;
                         data.cycle_complete = 1;
@@ -1415,7 +1406,7 @@ void set_ab_cycle(
                     data.start_appearance_count = 1;
                     form_ab_cycle(data);
                     if (data.flags[1] == 1 && data.number_of_ab_cycles == number_of_kids)
-                        goto RETURN;
+                        return;
                     data.start_new_trace = 1;
                     data.cycle_complete = 1;
                 } else {
@@ -1441,13 +1432,12 @@ void set_ab_cycle(
                 data.start_appearance_count = 1;
                 form_ab_cycle(data);
                 if (data.flags[1] == 1 && data.number_of_ab_cycles == number_of_kids)
-                    goto RETURN;
+                    return;
 
                 data.cycle_complete = 1;
             }
         }
     }
-RETURN:;
 }
 
 /** Block2 eset selection: weight each AB-cycle by its interaction with the others. */
@@ -1457,8 +1447,6 @@ void set_weight(
         const Individual& parent1,
         const Individual& parent2)
 {
-    VertexId next_vertex_id, previous_vertex_id;
-
     for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
         data.in_effect_node[vertex_id][0] = -1;
         data.in_effect_node[vertex_id][1] = -1;
@@ -1491,6 +1479,7 @@ void set_weight(
             int ab_number = data.in_effect_node[vertex_id][0];
             VertexId current_vertex_id = vertex_id;
 
+            VertexId previous_vertex_id = -1;
             if (parent1.neighbors[current_vertex_id][0] != parent2.neighbors[current_vertex_id][0] && parent1.neighbors[current_vertex_id][0] != parent2.neighbors[current_vertex_id][1]) {
                 previous_vertex_id = parent1.neighbors[current_vertex_id][0];
             } else if (parent1.neighbors[current_vertex_id][1] != parent2.neighbors[current_vertex_id][0] && parent1.neighbors[current_vertex_id][1] != parent2.neighbors[current_vertex_id][1]) {
@@ -1500,6 +1489,7 @@ void set_weight(
             while (true) {
                 data.in_effect_node[current_vertex_id][1] = ab_number;
 
+                VertexId next_vertex_id = -1;
                 if (parent1.neighbors[current_vertex_id][0] != previous_vertex_id) {
                     next_vertex_id = parent1.neighbors[current_vertex_id][0];
                 } else if (parent1.neighbors[current_vertex_id][1] != previous_vertex_id) {
@@ -1648,25 +1638,17 @@ void make_complete_sol(
         LocalSearchData<Distances>& data,
         Individual& child)
 {
-    int j1, j2;
-    VertexId unit_start, previous_vertex_id, current_vertex_id, next_vertex_id;
-    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
-    VertexId best_vertex_id_1, best_vertex_id_2, best_vertex_id_3, best_vertex_id_4;
-    int min_unit_vertex;
-    int center_unit_index, selected_unit_index;
-    Distance diff, max_diff;
-    int near_num, near_search_limit;
-
     data.modification_gain = 0;
     while (data.number_of_units != 1) {
-        min_unit_vertex = data.number_of_vertices + 12345;
+        int min_unit_vertex = data.number_of_vertices + 12345;
+        int center_unit_index;
         for (int u = 0; u < data.number_of_units; ++u)
             if (data.number_of_elements_in_unit[u] < min_unit_vertex) {
                 center_unit_index = u;
                 min_unit_vertex = data.number_of_elements_in_unit[u];
             }
 
-        unit_start = -1;
+        VertexId unit_start = -1;
         data.number_of_segments_for_center = 0;
         for (int s = 0; s < data.number_of_segments; ++s)
             if (data.segment_unit[s] == center_unit_index) {
@@ -1674,11 +1656,11 @@ void make_complete_sol(
                 unit_start = data.order[posi];
                 data.segment_for_center[data.number_of_segments_for_center++] = s;
             }
-        current_vertex_id = -1;
-        next_vertex_id = unit_start;
+        VertexId current_vertex_id = -1;
+        VertexId next_vertex_id = unit_start;
         data.number_of_elements_in_center_unit = 0;
         while (true) {
-            previous_vertex_id = current_vertex_id;
+            VertexId previous_vertex_id = current_vertex_id;
             current_vertex_id = next_vertex_id;
             data.center_unit[current_vertex_id] = 1;
             data.list_of_center_unit[data.number_of_elements_in_center_unit] = current_vertex_id;
@@ -1694,53 +1676,55 @@ void make_complete_sol(
         data.list_of_center_unit[data.number_of_elements_in_center_unit] = data.list_of_center_unit[0];
         data.list_of_center_unit[data.number_of_elements_in_center_unit + 1] = data.list_of_center_unit[1];
 
-        max_diff = std::numeric_limits<Distance>::min();
-        best_vertex_id_3 = -1;
-        best_vertex_id_4 = -1;
-        near_search_limit = 10;   // N_near
-        // near_search_limit <= max_near_vertices (capped by 'number_of_near_vertices' below)
+        // Look for the best 2-opt-like move connecting the center unit to
+        // another unit: first among the 10 nearest neighbors of each vertex of
+        // the center unit, then, if none is found, among the 50 nearest ones.
+        Distance max_diff = std::numeric_limits<Distance>::min();
+        VertexId best_vertex_id_1 = -1;
+        VertexId best_vertex_id_2 = -1;
+        VertexId best_vertex_id_3 = -1;
+        VertexId best_vertex_id_4 = -1;
+        for (int near_search_limit: {10, 50}) {
+            for (int s = 1; s <= data.number_of_elements_in_center_unit; ++s) {
+                VertexId vertex_id_1 = data.list_of_center_unit[s];
 
-    RESTART:
-        for (int s = 1; s <= data.number_of_elements_in_center_unit; ++s) {
-            vertex_id_1 = data.list_of_center_unit[s];
-
-            for (near_num = 1; near_num <= std::min(near_search_limit, data.number_of_near_vertices); ++near_num) {
-                vertex_id_3 = data.near_vertices[vertex_id_1][near_num];
-                if (data.center_unit[vertex_id_3] == 0) {
-                    for (j1 = 0; j1 < 2; ++j1) {
-                        vertex_id_2 = data.list_of_center_unit[s - 1 + 2 * j1];
-                        for (j2 = 0; j2 < 2; ++j2) {
-                            vertex_id_4 = child.neighbors[vertex_id_3][j2];
-                            diff = data.distances.distance(vertex_id_1, vertex_id_2) + data.distances.distance(vertex_id_3, vertex_id_4) - data.distances.distance(vertex_id_1, vertex_id_3) - data.distances.distance(vertex_id_2, vertex_id_4);
-                            if (diff > max_diff) {
-                                best_vertex_id_1 = vertex_id_1;
-                                best_vertex_id_2 = vertex_id_2;
-                                best_vertex_id_3 = vertex_id_3;
-                                best_vertex_id_4 = vertex_id_4;
-                                max_diff = diff;
-                            }
-                            diff = data.distances.distance(vertex_id_1, vertex_id_2) + data.distances.distance(vertex_id_4, vertex_id_3) -
-                                data.distances.distance(vertex_id_1, vertex_id_4) - data.distances.distance(vertex_id_2, vertex_id_3);
-                            if (diff > max_diff) {
-                                best_vertex_id_1 = vertex_id_1;
-                                best_vertex_id_2 = vertex_id_2;
-                                best_vertex_id_3 = vertex_id_4;
-                                best_vertex_id_4 = vertex_id_3;
-                                max_diff = diff;
+                for (int near_num = 1; near_num <= std::min(near_search_limit, data.number_of_near_vertices); ++near_num) {
+                    VertexId vertex_id_3 = data.near_vertices[vertex_id_1][near_num];
+                    if (data.center_unit[vertex_id_3] == 0) {
+                        for (int j1 = 0; j1 < 2; ++j1) {
+                            VertexId vertex_id_2 = data.list_of_center_unit[s - 1 + 2 * j1];
+                            for (int j2 = 0; j2 < 2; ++j2) {
+                                VertexId vertex_id_4 = child.neighbors[vertex_id_3][j2];
+                                Distance diff = data.distances.distance(vertex_id_1, vertex_id_2) + data.distances.distance(vertex_id_3, vertex_id_4) - data.distances.distance(vertex_id_1, vertex_id_3) - data.distances.distance(vertex_id_2, vertex_id_4);
+                                if (diff > max_diff) {
+                                    best_vertex_id_1 = vertex_id_1;
+                                    best_vertex_id_2 = vertex_id_2;
+                                    best_vertex_id_3 = vertex_id_3;
+                                    best_vertex_id_4 = vertex_id_4;
+                                    max_diff = diff;
+                                }
+                                diff = data.distances.distance(vertex_id_1, vertex_id_2) + data.distances.distance(vertex_id_4, vertex_id_3) -
+                                    data.distances.distance(vertex_id_1, vertex_id_4) - data.distances.distance(vertex_id_2, vertex_id_3);
+                                if (diff > max_diff) {
+                                    best_vertex_id_1 = vertex_id_1;
+                                    best_vertex_id_2 = vertex_id_2;
+                                    best_vertex_id_3 = vertex_id_4;
+                                    best_vertex_id_4 = vertex_id_3;
+                                    max_diff = diff;
+                                }
                             }
                         }
                     }
                 }
             }
+            if (best_vertex_id_3 != -1)
+                break;
         }
 
-        if (best_vertex_id_3 == -1 && near_search_limit == 10) {
-            near_search_limit = 50;
-            goto RESTART;
-        } else if (best_vertex_id_3 == -1 && near_search_limit == 50) {
+        if (best_vertex_id_3 == -1) {
             int random_center_index = std::uniform_int_distribution<int>(0, data.number_of_elements_in_center_unit - 2)(data.generator);
-            vertex_id_1 = data.list_of_center_unit[random_center_index];
-            vertex_id_2 = data.list_of_center_unit[random_center_index + 1];
+            VertexId vertex_id_1 = data.list_of_center_unit[random_center_index];
+            VertexId vertex_id_2 = data.list_of_center_unit[random_center_index + 1];
             for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
                 if (data.center_unit[vertex_id] == 0) {
                     best_vertex_id_1 = vertex_id_1;
@@ -1783,7 +1767,7 @@ void make_complete_sol(
         data.modification_gain += max_diff;
 
         int best_position_3 = data.inverse_order[best_vertex_id_3];
-        selected_unit_index = -1;
+        int selected_unit_index = -1;
         for (int s = 0; s < data.number_of_segments; ++s)
             if (data.segment[s][0] <= best_position_3 && best_position_3 <= data.segment[s][1]) {
                 selected_unit_index = data.segment_unit[s];
@@ -1853,20 +1837,19 @@ void make_unit(
         data.segment_unit[s] = -1;
     data.number_of_units = 0;
 
-    int start_position, position1, previous_position;
-    while (1) {
-        flag = 0;
+    while (true) {
+        int start_position = -1;
         for (int s = 0; s < data.number_of_segments; ++s) {
             if (data.segment_unit[s] == -1) {
                 start_position = data.segment[s][0];
-                previous_position = -1;
-                position1 = start_position;
-                flag = 1;
                 break;
             }
         }
-        if (flag == 0)
+        if (start_position == -1)
             break;
+
+        int previous_position = -1;
+        int position1 = start_position;
 
         while (1) {
             int segment_number = data.position_segment[position1];
@@ -2283,8 +2266,6 @@ void search_eset(
         LocalSearchData<Distances>& data,
         int center_ab)
 {
-    int selected_ab_cycle, selected_ab_cycle_non_tabu;
-
     data.number_of_c_nodes = 0; // Number of C nodes in E-set
     data.number_of_e_edges = 0; // Number of Edges in E-set
 
@@ -2309,6 +2290,8 @@ void search_eset(
         int min_delta_weight_non_tabu = 99999999;
         int improving_change = 0;
         int non_tabu_change = 0;
+        int selected_ab_cycle = -1;
+        int selected_ab_cycle_non_tabu = -1;
         for (int s1 = 0; s1 < data.number_of_ab_cycles; ++s1) {
             if (data.used_ab_cycle[s1] == 0 && data.weight_sr[s1] > 0) {
                 int delta_weight = data.weight_c[s1] - 2 * data.weight_sr[s1];
