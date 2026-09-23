@@ -2,12 +2,14 @@
 
 #include "travelingsalesmansolver/solution.hpp"
 #include "travelingsalesmansolver/algorithm_formatter.hpp"
+#include "travelingsalesmansolver/distances/ball_tree.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
 #include <limits>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -329,7 +331,13 @@ struct LocalSearchData
     /** Number of vertices. */
     VertexId number_of_vertices;
 
-    /** 'near_cities[vertex_id][k]' is the k-th nearest vertex to 'vertex_id'. */
+    /**
+     * Number of nearest neighbors stored per vertex (excluding the vertex
+     * itself): 'max_near_cities', or fewer for small instances.
+     */
+    int number_of_near_cities;
+
+    /** 'near_cities[vertex_id][k]' is the k-th nearest vertex to 'vertex_id' ('near_cities[vertex_id][0] == vertex_id'). */
     std::vector<std::vector<VertexId>> near_cities;
 
     ////////////////////////////////////////////////////////////////////////
@@ -545,7 +553,7 @@ struct LocalSearchData
     int number_of_generations_stage_1 = 0;
 };
 
-/** Number of nearest neighbors stored per vertex in 'near_cities'/'inverse_near_list'. */
+/** Maximum number of nearest neighbors stored per vertex in 'near_cities'/'inverse_near_list'. */
 static constexpr int max_near_cities = 50;
 
 /** The orientation opposite to 'orientation' (i.e. '1 - orientation'). */
@@ -560,24 +568,35 @@ template <typename Distances>
 void compute_near_cities(
         LocalSearchData<Distances>& data)
 {
-    std::vector<int> checked(data.number_of_vertices);
+    // Only build a ball tree if it is worth it, i.e. if some vertices are
+    // left out of the nearest neighbors lists.
+    std::unique_ptr<BallTree> ball_tree;
+    if (data.number_of_near_cities < data.number_of_vertices - 1)
+        ball_tree = std::make_unique<BallTree>(data.instance.distances());
+
     for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
-        std::fill(checked.begin(), checked.end(), 0);
-        checked[vertex_id] = 1;
-        data.near_cities[vertex_id][0] = vertex_id;
-        for (int k = 1; k <= max_near_cities; ++k) {
-            VertexId closest_vertex_id = -1;
-            Distance min_distance = std::numeric_limits<Distance>::max();
-            for (VertexId other_vertex_id = 0; other_vertex_id < data.number_of_vertices; ++other_vertex_id) {
-                if (checked[other_vertex_id] == 0
-                        && data.distances.distance(vertex_id, other_vertex_id) <= min_distance) {
-                    closest_vertex_id = other_vertex_id;
-                    min_distance = data.distances.distance(vertex_id, other_vertex_id);
-                }
-            }
-            data.near_cities[vertex_id][k] = closest_vertex_id;
-            checked[closest_vertex_id] = 1;
+        std::vector<VertexId> neighbor_ids;
+        if (ball_tree != nullptr) {
+            neighbor_ids = ball_tree->nearest_neighbors(
+                    vertex_id,
+                    data.number_of_near_cities);
+        } else {
+            for (VertexId other_vertex_id = 0; other_vertex_id < data.number_of_vertices; ++other_vertex_id)
+                if (other_vertex_id != vertex_id)
+                    neighbor_ids.push_back(other_vertex_id);
+            std::sort(
+                    neighbor_ids.begin(),
+                    neighbor_ids.end(),
+                    [&data, vertex_id](VertexId vertex_id_1, VertexId vertex_id_2)
+                    {
+                        return data.distances.distance(vertex_id, vertex_id_1)
+                            < data.distances.distance(vertex_id, vertex_id_2);
+                    });
         }
+
+        data.near_cities[vertex_id][0] = vertex_id;
+        for (int k = 1; k <= data.number_of_near_cities; ++k)
+            data.near_cities[vertex_id][k] = neighbor_ids[k - 1];
     }
 }
 
@@ -595,7 +614,8 @@ LocalSearchData<Distances>::LocalSearchData(
     output(output),
     algorithm_formatter(algorithm_formatter),
     number_of_vertices(number_of_vertices),
-    near_cities(number_of_vertices, std::vector<VertexId>(max_near_cities + 1)),
+    number_of_near_cities(std::min<VertexId>(max_near_cities, number_of_vertices - 1)),
+    near_cities(number_of_vertices, std::vector<VertexId>(number_of_near_cities + 1)),
     inverse_near_list(number_of_vertices),
     tree_neighbors(number_of_vertices),
     segment_neighbors(number_of_vertices),
@@ -613,7 +633,7 @@ LocalSearchData<Distances>::LocalSearchData(
     compute_near_cities(*this);
 
     for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
-        for (int k = 0; k < max_near_cities; ++k) {
+        for (int k = 0; k < number_of_near_cities; ++k) {
             VertexId near_vertex_id = near_cities[vertex_id][k];
             inverse_near_list[near_vertex_id].push_back(vertex_id);
         }
@@ -1221,7 +1241,7 @@ BEGIN:
                 goto RETURN;
             data.reversed = 0;
             data.t[2] = previous_city(data, data.t[1]);
-            for (int num1 = 1; num1 < max_near_cities; ++num1) {
+            for (int num1 = 1; num1 < data.number_of_near_cities; ++num1) {
                 data.t[4] = data.near_cities[data.t[1]][num1];
                 data.t[3] = previous_city(data, data.t[4]);
                 Distance dis1 = data.distances.distance(data.t[1], data.t[2]) - data.distances.distance(data.t[1], data.t[4]);
@@ -1240,7 +1260,7 @@ BEGIN:
             }
             data.reversed = 1;
             data.t[2] = next_city(data, data.t[1]);
-            for (int num1 = 1; num1 < max_near_cities; ++num1) {
+            for (int num1 = 1; num1 < data.number_of_near_cities; ++num1) {
                 data.t[4] = data.near_cities[data.t[1]][num1];
                 data.t[3] = next_city(data, data.t[4]);
                 Distance dis1 = data.distances.distance(data.t[1], data.t[2]) - data.distances.distance(data.t[1], data.t[4]);
@@ -1794,13 +1814,13 @@ void make_complete_sol(
         best_vertex_id_3 = -1;
         best_vertex_id_4 = -1;
         near_search_limit = 10;   // N_near
-        // near_search_limit <= max_near_cities
+        // near_search_limit <= max_near_cities (capped by 'number_of_near_cities' below)
 
     RESTART:
         for (int s = 1; s <= data.number_of_elements_in_center_unit; ++s) {
             vertex_id_1 = data.list_of_center_unit[s];
 
-            for (near_num = 1; near_num <= near_search_limit; ++near_num) {
+            for (near_num = 1; near_num <= std::min(near_search_limit, data.number_of_near_cities); ++near_num) {
                 vertex_id_3 = data.near_cities[vertex_id_1][near_num];
                 if (data.center_unit[vertex_id_3] == 0) {
                     for (j1 = 0; j1 < 2; ++j1) {
