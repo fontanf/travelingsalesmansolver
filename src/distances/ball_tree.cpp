@@ -156,50 +156,53 @@ std::vector<VertexId> BallTree::nearest_neighbors(
         NodeId node_id = stack.back();
         stack.pop_back();
         const Node& node = tree_[node_id];
-        //std::cout << "node_id " << node_id << std::endl;
 
-        // Compute the minimum distance between vertex 'vertex_id' and any point
-        // in the current node.
+        Distance distance_center = distances.distance(
+                vertex_id,
+                node.center_vertex_id);
+
+        // Compute a lower bound on the distance between vertex 'vertex_id' and
+        // any vertex in the current node.
+        // This relies on the triangle inequality: if the distances don't
+        // satisfy it (e.g. rounded or explicit distances), the result is only
+        // an approximation of the nearest neighbors.
         if (neighbors_tmp_.size() == number_of_neighbors) {
-            Distance distance_min = distances.distance(
-                    vertex_id,
-                    node.center_vertex_id)
-                - node.radius;
-            //std::cout << " distance_min " << distance_min << std::endl;
+            Distance distance_min = distance_center - node.radius;
             if (distance_min >= -neighbors_tmp_.top().second)
                 continue;
         }
 
         if (!node.vertex_ids.empty()) {
-            //std::cout << " leaf " << std::endl;
             // The node is a leaf.
-            Distance distance = distances.distance(
-                    vertex_id,
-                    node.center_vertex_id);
             for (VertexId neighbor_id: node.vertex_ids) {
                 if (neighbor_id == vertex_id)
                     continue;
-                //std::cout << " add neighbor_id " << neighbor_id
-                //    << " distance " << distance
-                //    << std::endl;
+                Distance distance = distances.distance(
+                        vertex_id,
+                        neighbor_id);
                 neighbors_tmp_.update_key(neighbor_id, -distance);
                 if (neighbors_tmp_.size() > number_of_neighbors)
                     neighbors_tmp_.pop();
             }
         } else {
-            // Recursion.
-            stack.push_back(node.lesser_child_id);
-            stack.push_back(node.greater_child_id);
+            // Recursion: the child which is the most likely to contain the
+            // nearest neighbors is visited first (i.e. pushed last).
+            if (distance_center < node.median_distance) {
+                stack.push_back(node.greater_child_id);
+                stack.push_back(node.lesser_child_id);
+            } else {
+                stack.push_back(node.lesser_child_id);
+                stack.push_back(node.greater_child_id);
+            }
         }
     }
 
-    // Convert heap to vector.
-    std::vector<VertexId> neighbor_ids;
-    for (VertexId pos = neighbors_tmp_.size() - 1;
-            pos >= 0;
-            --pos) {
-        VertexId vertex_id = neighbors_tmp_.top(pos).first;
-        neighbor_ids.push_back(vertex_id);
+    // Convert heap to vector, sorted by increasing distance.
+    // The element at the top of the heap is the farthest one.
+    std::vector<VertexId> neighbor_ids(neighbors_tmp_.size());
+    for (VertexId pos = neighbor_ids.size() - 1; pos >= 0; --pos) {
+        neighbor_ids[pos] = neighbors_tmp_.top().first;
+        neighbors_tmp_.pop();
     }
 
     return neighbor_ids;
