@@ -15,7 +15,6 @@
 
 namespace travelingsalesmansolver
 {
-
 struct LocalSearchParameters: Parameters
 {
     /** Population size. */
@@ -55,7 +54,6 @@ const Output local_search(
  */
 namespace
 {
-
 /** A TSP tour, represented as a doubly-linked list over its vertices. */
 struct Individual
 {
@@ -103,7 +101,6 @@ struct Individual
  */
 class EdgeFrequencies
 {
-
 public:
 
     /** Constructor. */
@@ -896,13 +893,11 @@ template <typename Distances>
 void apply_move(
         LocalSearchData<Distances>& data)
 {
-    VertexId t1_s, t1_e, t2_s, t2_e;
-
-    if (data.reversed == 0) {
-        t1_s = data.t[1]; t1_e = data.t[3]; t2_s = data.t[4]; t2_e = data.t[2];
-    } else {
-        t1_s = data.t[2]; t1_e = data.t[4]; t2_s = data.t[3]; t2_e = data.t[1];
-    }
+    bool reversed = (data.reversed != 0);
+    VertexId t1_s = data.t[reversed? 2: 1];
+    VertexId t1_e = data.t[reversed? 4: 3];
+    VertexId t2_s = data.t[reversed? 3: 4];
+    VertexId t2_e = data.t[reversed? 1: 2];
 
     int seg_t1_s = data.vertex_segment[t1_s];
     int ordSeg_t1_s = data.segment_order[seg_t1_s];
@@ -1244,24 +1239,16 @@ template <typename Distances>
 void form_ab_cycle(
         LocalSearchData<Distances>& data)
 {
-    VertexId cycle_start;
-    VertexId visiting_vertex;
-    VertexId stock;
-    int start_count;
-    int edge_type;
-    int cycle_length;
-    Distance diff;
-
-    edge_type = (data.position_current % 2 == 0)? 1: 2;
-    cycle_start = data.route[data.position_current];
-    cycle_length = 0;
+    int edge_type = (data.position_current % 2 == 0)? 1: 2;
+    VertexId cycle_start = data.route[data.position_current];
+    int cycle_length = 0;
     data.cycle_buffer[cycle_length] = cycle_start;
 
-    start_count = 0;
+    int start_count = 0;
     while (true) {
         ++cycle_length;
         --data.position_current;
-        visiting_vertex = data.route[data.position_current];
+        VertexId visiting_vertex = data.route[data.position_current];
         if (data.near_data[visiting_vertex][0] == 2) {
             data.unbranched[data.unbranched_index[visiting_vertex]] = data.unbranched[data.number_of_unbranched - 1];
             data.unbranched_index[data.unbranched[data.number_of_unbranched - 1]] = data.unbranched_index[visiting_vertex];
@@ -1292,7 +1279,7 @@ void form_ab_cycle(
     data.ab_cycle[data.number_of_ab_cycles][0] = cycle_length;
 
     if (edge_type == 2) {
-        stock = data.cycle_buffer[0];
+        VertexId stock = data.cycle_buffer[0];
         for (int j = 0; j < cycle_length - 1; ++j)
             data.cycle_buffer[j] = data.cycle_buffer[j + 1];
         data.cycle_buffer[cycle_length - 1] = stock;
@@ -1307,7 +1294,7 @@ void form_ab_cycle(
 
     data.cycle_buffer[cycle_length] = data.cycle_buffer[0];
     data.cycle_buffer[cycle_length + 1] = data.cycle_buffer[1];
-    diff = 0;
+    Distance diff = 0;
     for (int j = 0; j < cycle_length / 2; ++j)
         diff = diff + data.distances.distance(data.cycle_buffer[2 * j], data.cycle_buffer[1 + 2 * j]) - data.distances.distance(data.cycle_buffer[1 + 2 * j], data.cycle_buffer[2 + 2 * j]);
 
@@ -1470,9 +1457,7 @@ void set_weight(
         const Individual& parent1,
         const Individual& parent2)
 {
-    int cycle_length;
-    VertexId red_vertex_id_1, red_vertex_id_2, current_vertex_id, next_vertex_id, previous_vertex_id;
-    int ab_number;
+    VertexId next_vertex_id, previous_vertex_id;
 
     for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
         data.in_effect_node[vertex_id][0] = -1;
@@ -1481,10 +1466,10 @@ void set_weight(
 
     // Step 1:
     for (int s = 0; s < data.number_of_ab_cycles; ++s) {
-        cycle_length = data.ab_cycle[s][0];
+        int cycle_length = data.ab_cycle[s][0];
         for (int j = 0; j < cycle_length / 2; ++j) {
-            red_vertex_id_1 = data.ab_cycle[s][2 * j + 2]; // red edge
-            red_vertex_id_2 = data.ab_cycle[s][2 * j + 3];
+            VertexId red_vertex_id_1 = data.ab_cycle[s][2 * j + 2]; // red edge
+            VertexId red_vertex_id_2 = data.ab_cycle[s][2 * j + 3];
 
             if (data.in_effect_node[red_vertex_id_1][0] == -1) {
                 data.in_effect_node[red_vertex_id_1][0] = s;
@@ -1503,8 +1488,8 @@ void set_weight(
     // Step 2:
     for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
         if (data.in_effect_node[vertex_id][0] != -1 && data.in_effect_node[vertex_id][1] == -1) {
-            ab_number = data.in_effect_node[vertex_id][0];
-            current_vertex_id = vertex_id;
+            int ab_number = data.in_effect_node[vertex_id][0];
+            VertexId current_vertex_id = vertex_id;
 
             if (parent1.neighbors[current_vertex_id][0] != parent2.neighbors[current_vertex_id][0] && parent1.neighbors[current_vertex_id][0] != parent2.neighbors[current_vertex_id][1]) {
                 previous_vertex_id = parent1.neighbors[current_vertex_id][0];
@@ -1580,9 +1565,8 @@ void set_parents(
     VertexId start_vertex_id = 0;
     VertexId current_vertex_id = -1;
     VertexId next_vertex_id = start_vertex_id;
-    VertexId previous_vertex_id;
     for (int i = 0; i < data.number_of_vertices; ++i) {
-        previous_vertex_id = current_vertex_id;
+        VertexId previous_vertex_id = current_vertex_id;
         current_vertex_id = next_vertex_id;
         if (parent1.neighbors[current_vertex_id][0] != previous_vertex_id) {
             next_vertex_id = parent1.neighbors[current_vertex_id][0];
@@ -1608,27 +1592,22 @@ void change_sol(
         int ab_number,
         int type)
 {
-    int j;
-    int cycle_length;
-    VertexId red_vertex_id_1, red_vertex_id_2, blue_vertex_id_1, blue_vertex_id_2;
-    int red_position_1, red_position_2, blue_position_1, blue_position_2;
-
-    cycle_length = data.ab_cycle[ab_number][0];
+    int cycle_length = data.ab_cycle[ab_number][0];
     data.cycle_buffer[0] = data.ab_cycle[ab_number][0];
 
     if (type == 2) {
-        for (j = 0; j < cycle_length + 3; ++j)
+        for (int j = 0; j < cycle_length + 3; ++j)
             data.cycle_buffer[cycle_length + 3 - j] = data.ab_cycle[ab_number][j + 1];
     } else {
-        for (j = 1; j <= cycle_length + 3; ++j)
+        for (int j = 1; j <= cycle_length + 3; ++j)
             data.cycle_buffer[j] = data.ab_cycle[ab_number][j];
     }
 
-    for (j = 0; j < cycle_length / 2; ++j) {
-        red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
-        red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
-        blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
-        blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
+    for (int j = 0; j < cycle_length / 2; ++j) {
+        VertexId red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
+        VertexId red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
+        VertexId blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
+        VertexId blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
 
         if (child.neighbors[red_vertex_id_1][0] == red_vertex_id_2) {
             child.neighbors[red_vertex_id_1][0] = blue_vertex_id_1;
@@ -1641,10 +1620,10 @@ void change_sol(
             child.neighbors[red_vertex_id_2][1] = blue_vertex_id_2;
         }
 
-        red_position_1 = data.inverse_order[red_vertex_id_1];
-        red_position_2 = data.inverse_order[red_vertex_id_2];
-        blue_position_1 = data.inverse_order[blue_vertex_id_1];
-        blue_position_2 = data.inverse_order[blue_vertex_id_2];
+        int red_position_1 = data.inverse_order[red_vertex_id_1];
+        int red_position_2 = data.inverse_order[red_vertex_id_2];
+        int blue_position_1 = data.inverse_order[blue_vertex_id_1];
+        int blue_position_2 = data.inverse_order[blue_vertex_id_2];
 
         if (red_position_1 == 0 && red_position_2 == data.number_of_vertices - 1) {
             data.segment_position_list[data.number_of_segment_positions++] = red_position_1;
@@ -1874,8 +1853,7 @@ void make_unit(
         data.segment_unit[s] = -1;
     data.number_of_units = 0;
 
-    int start_position, position1, position2, next_position, previous_position;
-    int segment_number;
+    int start_position, position1, previous_position;
     while (1) {
         flag = 0;
         for (int s = 0; s < data.number_of_segments; ++s) {
@@ -1891,11 +1869,11 @@ void make_unit(
             break;
 
         while (1) {
-            segment_number = data.position_segment[position1];
+            int segment_number = data.position_segment[position1];
             data.segment_unit[segment_number] = data.number_of_units;
 
-            position2 = data.link_a_position[position1];
-            next_position = data.link_b_position[position2][0];
+            int position2 = data.link_a_position[position1];
+            int next_position = data.link_b_position[position2][0];
             if (position1 == position2)
                 if (next_position == previous_position)
                     next_position = data.link_b_position[position2][1];
@@ -1937,14 +1915,11 @@ void back_to_pa1(
         LocalSearchData<Distances>& data,
         Individual& child)
 {
-    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
-    int jnum;
-
     for (int s = data.number_of_modified_edges - 1; s >= 0; --s) {
-        vertex_id_1 = data.modified_edge[s][0];
-        vertex_id_3 = data.modified_edge[s][1];
-        vertex_id_2 = data.modified_edge[s][2];
-        vertex_id_4 = data.modified_edge[s][3];
+        VertexId vertex_id_1 = data.modified_edge[s][0];
+        VertexId vertex_id_3 = data.modified_edge[s][1];
+        VertexId vertex_id_2 = data.modified_edge[s][2];
+        VertexId vertex_id_4 = data.modified_edge[s][3];
 
         if (child.neighbors[vertex_id_1][0] == vertex_id_2) {
             child.neighbors[vertex_id_1][0] = vertex_id_3;
@@ -1969,7 +1944,7 @@ void back_to_pa1(
     }
 
     for (int s = 0; s < data.number_of_applied_cycles; ++s) {
-        jnum = data.applied_cycle[s];
+        int jnum = data.applied_cycle[s];
         change_sol(data, child, jnum, 2);
     }
 }
@@ -1980,19 +1955,16 @@ void go_to_best(
         LocalSearchData<Distances>& data,
         Individual& child)
 {
-    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
-    int jnum;
-
     for (int s = 0; s < data.number_of_best_applied_cycles; ++s) {
-        jnum = data.best_applied_cycle[s];
+        int jnum = data.best_applied_cycle[s];
         change_sol(data, child, jnum, 1);
     }
 
     for (int s = 0; s < data.number_of_best_modified_edges; ++s) {
-        vertex_id_1 = data.best_modified_edge[s][0];
-        vertex_id_2 = data.best_modified_edge[s][1];
-        vertex_id_3 = data.best_modified_edge[s][2];
-        vertex_id_4 = data.best_modified_edge[s][3];
+        VertexId vertex_id_1 = data.best_modified_edge[s][0];
+        VertexId vertex_id_2 = data.best_modified_edge[s][1];
+        VertexId vertex_id_3 = data.best_modified_edge[s][2];
+        VertexId vertex_id_4 = data.best_modified_edge[s][3];
 
         if (child.neighbors[vertex_id_1][0] == vertex_id_2) {
             child.neighbors[vertex_id_1][0] = vertex_id_3;
@@ -2022,24 +1994,20 @@ template <typename Distances>
 void increment_edge_freq(
         LocalSearchData<Distances>& data)
 {
-    int j, jnum, cycle_length;
-    VertexId red_vertex_id_1, red_vertex_id_2, blue_vertex_id_1, blue_vertex_id_2;
-    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
-
     for (int s = 0; s < data.number_of_best_applied_cycles; ++s) {
-        jnum = data.best_applied_cycle[s];
+        int jnum = data.best_applied_cycle[s];
 
-        cycle_length = data.ab_cycle[jnum][0];
+        int cycle_length = data.ab_cycle[jnum][0];
         data.cycle_buffer[0] = data.ab_cycle[jnum][0];
 
-        for (j = 1; j <= cycle_length + 3; ++j)
+        for (int j = 1; j <= cycle_length + 3; ++j)
             data.cycle_buffer[j] = data.ab_cycle[jnum][j];
 
-        for (j = 0; j < cycle_length / 2; ++j) {
-            red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
-            red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
-            blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
-            blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
+        for (int j = 0; j < cycle_length / 2; ++j) {
+            VertexId red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
+            VertexId red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
+            VertexId blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
+            VertexId blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
 
             data.edge_frequency.add(red_vertex_id_1, blue_vertex_id_1, 1);
             data.edge_frequency.add(red_vertex_id_1, red_vertex_id_2, -1);
@@ -2048,10 +2016,10 @@ void increment_edge_freq(
         }
     }
     for (int s = 0; s < data.number_of_best_modified_edges; ++s) {
-        vertex_id_1 = data.best_modified_edge[s][0];
-        vertex_id_2 = data.best_modified_edge[s][1];
-        vertex_id_3 = data.best_modified_edge[s][2];
-        vertex_id_4 = data.best_modified_edge[s][3];
+        VertexId vertex_id_1 = data.best_modified_edge[s][0];
+        VertexId vertex_id_2 = data.best_modified_edge[s][1];
+        VertexId vertex_id_3 = data.best_modified_edge[s][2];
+        VertexId vertex_id_4 = data.best_modified_edge[s][3];
 
         data.edge_frequency.add(vertex_id_1, vertex_id_2, -1);
         data.edge_frequency.add(vertex_id_3, vertex_id_4, -1);
@@ -2069,26 +2037,21 @@ template <typename Distances>
 int calc_adaptive_loss(
         LocalSearchData<Distances>& data)
 {
-    int j, jnum, cycle_length;
-    VertexId red_vertex_id_1, red_vertex_id_2, blue_vertex_id_1, blue_vertex_id_2;
-    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
-    double loss;
-
-    loss = 0;
+    double loss = 0;
     for (int s = 0; s < data.number_of_applied_cycles; ++s) {
-        jnum = data.applied_cycle[s];
+        int jnum = data.applied_cycle[s];
 
-        cycle_length = data.ab_cycle[jnum][0];
+        int cycle_length = data.ab_cycle[jnum][0];
         data.cycle_buffer[0] = data.ab_cycle[jnum][0];
 
-        for (j = 1; j <= cycle_length + 3; ++j)
+        for (int j = 1; j <= cycle_length + 3; ++j)
             data.cycle_buffer[j] = data.ab_cycle[jnum][j];
 
-        for (j = 0; j < cycle_length / 2; ++j) {
-            red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
-            red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
-            blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
-            blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
+        for (int j = 0; j < cycle_length / 2; ++j) {
+            VertexId red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
+            VertexId red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
+            VertexId blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
+            VertexId blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
 
             loss -= (data.edge_frequency.get(red_vertex_id_1, red_vertex_id_2) - 1);
             loss -= (data.edge_frequency.get(red_vertex_id_2, red_vertex_id_1) - 1);
@@ -2102,10 +2065,10 @@ int calc_adaptive_loss(
         }
     }
     for (int s = 0; s < data.number_of_modified_edges; ++s) {
-        vertex_id_1 = data.modified_edge[s][0];
-        vertex_id_2 = data.modified_edge[s][1];
-        vertex_id_3 = data.modified_edge[s][2];
-        vertex_id_4 = data.modified_edge[s][3];
+        VertexId vertex_id_1 = data.modified_edge[s][0];
+        VertexId vertex_id_2 = data.modified_edge[s][1];
+        VertexId vertex_id_3 = data.modified_edge[s][2];
+        VertexId vertex_id_4 = data.modified_edge[s][3];
 
         loss -= (data.edge_frequency.get(vertex_id_1, vertex_id_2) - 1);
         loss -= (data.edge_frequency.get(vertex_id_2, vertex_id_1) - 1);
@@ -2128,17 +2091,17 @@ int calc_adaptive_loss(
         data.edge_frequency.add(vertex_id_4, vertex_id_2, 1);
     }
     for (int s = 0; s < data.number_of_applied_cycles; ++s) {
-        jnum = data.applied_cycle[s];
-        cycle_length = data.ab_cycle[jnum][0];
+        int jnum = data.applied_cycle[s];
+        int cycle_length = data.ab_cycle[jnum][0];
         data.cycle_buffer[0] = data.ab_cycle[jnum][0];
-        for (j = 1; j <= cycle_length + 3; ++j)
+        for (int j = 1; j <= cycle_length + 3; ++j)
             data.cycle_buffer[j] = data.ab_cycle[jnum][j];
 
-        for (j = 0; j < cycle_length / 2; ++j) {
-            red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
-            red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
-            blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
-            blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
+        for (int j = 0; j < cycle_length / 2; ++j) {
+            VertexId red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
+            VertexId red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
+            VertexId blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
+            VertexId blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
 
             data.edge_frequency.add(red_vertex_id_1, red_vertex_id_2, 1);
             data.edge_frequency.add(red_vertex_id_2, red_vertex_id_1, 1);
@@ -2147,10 +2110,10 @@ int calc_adaptive_loss(
         }
     }
     for (int s = 0; s < data.number_of_modified_edges; ++s) {
-        vertex_id_1 = data.modified_edge[s][0];
-        vertex_id_2 = data.modified_edge[s][1];
-        vertex_id_3 = data.modified_edge[s][2];
-        vertex_id_4 = data.modified_edge[s][3];
+        VertexId vertex_id_1 = data.modified_edge[s][0];
+        VertexId vertex_id_2 = data.modified_edge[s][1];
+        VertexId vertex_id_3 = data.modified_edge[s][2];
+        VertexId vertex_id_4 = data.modified_edge[s][3];
 
         data.edge_frequency.add(vertex_id_1, vertex_id_2, 1);
         data.edge_frequency.add(vertex_id_2, vertex_id_1, 1);
@@ -2170,29 +2133,23 @@ template <typename Distances>
 double calc_entropy_loss(
         LocalSearchData<Distances>& data)
 {
-    int j, jnum, cycle_length;
-    VertexId red_vertex_id_1, red_vertex_id_2, blue_vertex_id_1, blue_vertex_id_2;
-    VertexId vertex_id_1, vertex_id_2, vertex_id_3, vertex_id_4;
-    double loss;
-    double h1, h2;
-
-    loss = 0;  // AB-cycle
+    double loss = 0;  // AB-cycle
     for (int s = 0; s < data.number_of_applied_cycles; ++s) {
-        jnum = data.applied_cycle[s];
-        cycle_length = data.ab_cycle[jnum][0];
+        int jnum = data.applied_cycle[s];
+        int cycle_length = data.ab_cycle[jnum][0];
         data.cycle_buffer[0] = data.ab_cycle[jnum][0];
 
-        for (j = 1; j <= cycle_length + 3; ++j)
+        for (int j = 1; j <= cycle_length + 3; ++j)
             data.cycle_buffer[j] = data.ab_cycle[jnum][j];
 
-        for (j = 0; j < cycle_length / 2; ++j) {
-            red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
-            red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
-            blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
-            blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
+        for (int j = 0; j < cycle_length / 2; ++j) {
+            VertexId red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
+            VertexId red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
+            VertexId blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
+            VertexId blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
 
-            h1 = (double)(data.edge_frequency.get(red_vertex_id_1, red_vertex_id_2) - 1) / (double)data.population_size;
-            h2 = (double)(data.edge_frequency.get(red_vertex_id_1, red_vertex_id_2)) / (double)data.population_size;
+            double h1 = (double)(data.edge_frequency.get(red_vertex_id_1, red_vertex_id_2) - 1) / (double)data.population_size;
+            double h2 = (double)(data.edge_frequency.get(red_vertex_id_1, red_vertex_id_2)) / (double)data.population_size;
             if (data.edge_frequency.get(red_vertex_id_1, red_vertex_id_2) - 1 != 0)
                 loss -= h1 * log(h1);
             loss += h2 * log(h2);
@@ -2210,13 +2167,13 @@ double calc_entropy_loss(
     }
 
     for (int s = 0; s < data.number_of_modified_edges; ++s) {
-        vertex_id_1 = data.modified_edge[s][0];
-        vertex_id_2 = data.modified_edge[s][1];
-        vertex_id_3 = data.modified_edge[s][2];
-        vertex_id_4 = data.modified_edge[s][3];
+        VertexId vertex_id_1 = data.modified_edge[s][0];
+        VertexId vertex_id_2 = data.modified_edge[s][1];
+        VertexId vertex_id_3 = data.modified_edge[s][2];
+        VertexId vertex_id_4 = data.modified_edge[s][3];
 
-        h1 = (double)(data.edge_frequency.get(vertex_id_1, vertex_id_2) - 1) / (double)data.population_size;
-        h2 = (double)(data.edge_frequency.get(vertex_id_1, vertex_id_2)) / (double)data.population_size;
+        double h1 = (double)(data.edge_frequency.get(vertex_id_1, vertex_id_2) - 1) / (double)data.population_size;
+        double h2 = (double)(data.edge_frequency.get(vertex_id_1, vertex_id_2)) / (double)data.population_size;
         if (data.edge_frequency.get(vertex_id_1, vertex_id_2) - 1 != 0)
             loss -= h1 * log(h1);
         loss += h2 * log(h2);
@@ -2251,19 +2208,19 @@ double calc_entropy_loss(
 
     // restores data.edge_frequency
     for (int s = 0; s < data.number_of_applied_cycles; ++s) {
-        jnum = data.applied_cycle[s];
+        int jnum = data.applied_cycle[s];
 
-        cycle_length = data.ab_cycle[jnum][0];
+        int cycle_length = data.ab_cycle[jnum][0];
         data.cycle_buffer[0] = data.ab_cycle[jnum][0];
 
-        for (j = 1; j <= cycle_length + 3; ++j)
+        for (int j = 1; j <= cycle_length + 3; ++j)
             data.cycle_buffer[j] = data.ab_cycle[jnum][j];
 
-        for (j = 0; j < cycle_length / 2; ++j) {
-            red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
-            red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
-            blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
-            blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
+        for (int j = 0; j < cycle_length / 2; ++j) {
+            VertexId red_vertex_id_1 = data.cycle_buffer[2 + 2 * j];
+            VertexId red_vertex_id_2 = data.cycle_buffer[3 + 2 * j];
+            VertexId blue_vertex_id_1 = data.cycle_buffer[1 + 2 * j];
+            VertexId blue_vertex_id_2 = data.cycle_buffer[4 + 2 * j];
 
             data.edge_frequency.add(red_vertex_id_1, red_vertex_id_2, 1);
             data.edge_frequency.add(red_vertex_id_2, red_vertex_id_1, 1);
@@ -2272,10 +2229,10 @@ double calc_entropy_loss(
         }
     }
     for (int s = 0; s < data.number_of_modified_edges; ++s) {
-        vertex_id_1 = data.modified_edge[s][0];
-        vertex_id_2 = data.modified_edge[s][1];
-        vertex_id_3 = data.modified_edge[s][2];
-        vertex_id_4 = data.modified_edge[s][3];
+        VertexId vertex_id_1 = data.modified_edge[s][0];
+        VertexId vertex_id_2 = data.modified_edge[s][1];
+        VertexId vertex_id_3 = data.modified_edge[s][2];
+        VertexId vertex_id_4 = data.modified_edge[s][3];
 
         data.edge_frequency.add(vertex_id_1, vertex_id_2, 1);
         data.edge_frequency.add(vertex_id_2, vertex_id_1, 1);
@@ -2326,11 +2283,7 @@ void search_eset(
         LocalSearchData<Distances>& data,
         int center_ab)
 {
-    int iteration, stagnation;
-    int delta_weight, min_delta_weight_non_tabu;
-    int improving_change, non_tabu_change;
     int selected_ab_cycle, selected_ab_cycle_non_tabu;
-    int jnum;
 
     data.number_of_c_nodes = 0; // Number of C nodes in E-set
     data.number_of_e_edges = 0; // Number of Edges in E-set
@@ -2343,22 +2296,22 @@ void search_eset(
     }
 
     for (int s = 0; s < data.number_of_ab_cycles_in_eset; ++s) {
-        jnum = data.ab_cycle_in_eset[s];
+        int jnum = data.ab_cycle_in_eset[s];
         add_ab(data, jnum);
     }
     data.best_number_of_c_nodes = data.number_of_c_nodes;
     data.best_number_of_e_edges = data.number_of_e_edges;
 
-    stagnation = 0;
-    iteration = 0;
+    int stagnation = 0;
+    int iteration = 0;
     while (1) {
         ++iteration;
-        min_delta_weight_non_tabu = 99999999;
-        improving_change = 0;
-        non_tabu_change = 0;
+        int min_delta_weight_non_tabu = 99999999;
+        int improving_change = 0;
+        int non_tabu_change = 0;
         for (int s1 = 0; s1 < data.number_of_ab_cycles; ++s1) {
             if (data.used_ab_cycle[s1] == 0 && data.weight_sr[s1] > 0) {
-                delta_weight = data.weight_c[s1] - 2 * data.weight_sr[s1];
+                int delta_weight = data.weight_c[s1] - 2 * data.weight_sr[s1];
                 if (data.number_of_c_nodes + delta_weight < data.best_number_of_c_nodes) {
                     selected_ab_cycle = s1;
                     improving_change = 1;
@@ -2370,7 +2323,7 @@ void search_eset(
                     min_delta_weight_non_tabu = delta_weight;
                 }
             } else if (data.used_ab_cycle[s1] == 1 && s1 != center_ab) {
-                delta_weight = - data.weight_c[s1] + 2 * data.weight_sr[s1];
+                int delta_weight = - data.weight_c[s1] + 2 * data.weight_sr[s1];
                 if (data.number_of_c_nodes + delta_weight < data.best_number_of_c_nodes) {
                     selected_ab_cycle = s1;
                     improving_change = -1;
@@ -2425,21 +2378,10 @@ void run_cross(
         int number_of_kids,
         int flag_p)
 {
-    int number_of_candidates;
-    int jnum, center_ab;
-    Distance gain;
-    Distance best_gain;
-    double best_point, point;
-    double loss;
-
     data.evaluation_type = data.flags[0]; // 1:Greedy, 2:---, 3:Distance, 4:Entropy
     data.eset_strategy = data.flags[1]; // 1:Single-AB, 2:Block2
 
-    if (number_of_kids <= data.number_of_ab_cycles) {
-        number_of_candidates = number_of_kids;
-    } else {
-        number_of_candidates = data.number_of_ab_cycles;
-    }
+    int number_of_candidates = std::min(number_of_kids, data.number_of_ab_cycles);
 
     if (data.eset_strategy == 1) { // Single-AB
         std::iota(data.permutation.begin(), data.permutation.begin() + data.number_of_ab_cycles, 0);
@@ -2458,17 +2400,17 @@ void run_cross(
                 });
     }
     data.number_of_generated_children = 0;
-    best_point = 0.0;
-    best_gain = 0;
+    double best_point = 0.0;
+    Distance best_gain = 0;
     bool improved = false;
     for (int j = 0; j < number_of_candidates; ++j) {
         data.number_of_ab_cycles_in_eset = 0;
         if (data.eset_strategy == 1) { //Single-AB
-            jnum = data.permutation[j];
+            int jnum = data.permutation[j];
             data.ab_cycle_in_eset[data.number_of_ab_cycles_in_eset++] = jnum;
         } else if (data.eset_strategy == 2) { //Block2
-            jnum = data.permutation[j];
-            center_ab = jnum;
+            int jnum = data.permutation[j];
+            int center_ab = jnum;
             // Add 'center_ab' and, with probability 1/2 each, the smaller
             // AB-cycles sharing vertices with it, by increasing number.
             bool center_added = false;
@@ -2488,14 +2430,14 @@ void run_cross(
             search_eset(data, center_ab);
         }
         data.number_of_segment_positions = 0;
-        gain = 0;
+        Distance gain = 0;
         data.number_of_applied_cycles = 0;
         data.number_of_modified_edges = 0;
 
         data.number_of_applied_cycles = data.number_of_ab_cycles_in_eset;
         for (int k = 0; k < data.number_of_applied_cycles; ++k) {
             data.applied_cycle[k] = data.ab_cycle_in_eset[k];
-            jnum = data.applied_cycle[k];
+            int jnum = data.applied_cycle[k];
             change_sol(data, child, jnum, flag_p);
             gain += data.gain_ab[jnum];
         }
@@ -2506,9 +2448,8 @@ void run_cross(
 
         ++data.number_of_generated_children;
 
-        if (data.evaluation_type == 1) { // Greedy
-            loss = 1.0;
-        } else if (data.evaluation_type == 3) { // Distance preservation
+        double loss = 1.0; // Greedy
+        if (data.evaluation_type == 3) { // Distance preservation
             loss = calc_adaptive_loss(data);
         } else if (data.evaluation_type == 4) { // Entropy preservation
             loss = calc_entropy_loss(data);
@@ -2517,7 +2458,7 @@ void run_cross(
         if (loss <= 0.0)
             loss = 0.00000001;
 
-        point = (double)gain / loss;
+        double point = (double)gain / loss;
         child.length = child.length - gain;
 
         if (best_point < point && child.length != parent2.length) {
@@ -2553,14 +2494,11 @@ template <typename Distances>
 int calc_c_naive(
         LocalSearchData<Distances>& data)
 {
-    int count_c_nodes;
-    int tally;
-
-    count_c_nodes = 0;
+    int count_c_nodes = 0;
 
     for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
         if (data.in_effect_node[vertex_id][0] != -1 && data.in_effect_node[vertex_id][1] != -1) {
-            tally = 0;
+            int tally = 0;
             if (data.used_ab_cycle[data.in_effect_node[vertex_id][0]] == 1)
                 ++tally;
             if (data.used_ab_cycle[data.in_effect_node[vertex_id][1]] == 1)
