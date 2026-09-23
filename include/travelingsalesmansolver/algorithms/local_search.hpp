@@ -291,12 +291,6 @@ struct LocalSearchData
     /** Current number of segments in the 2-opt tree representation. */
     int number_of_tree_segments = 0;
 
-    /** Whether the move currently being applied reverses the tour direction. */
-    int reversed = 0;
-
-    /** Length of the tour, as tracked incrementally by the tree representation. */
-    Distance tour_length = 0;
-
     /** 'tree_neighbors[vertex_id]' holds the two vertices adjacent to 'vertex_id' within its segment ('-1' at a segment end). */
     std::vector<std::array<VertexId, 2>> tree_neighbors;
 
@@ -305,9 +299,6 @@ struct LocalSearchData
 
     /** 'segment_endpoints[s]' holds the two endpoint vertices of segment 's'. */
     std::vector<std::array<VertexId, 2>> segment_endpoints;
-
-    /** The four vertices ('t[1]'..'t[4]') involved in the move currently being considered. */
-    std::array<VertexId, 5> t;
 
     /** 'vertex_segment[vertex_id]' is the segment 'vertex_id' belongs to. */
     std::vector<int> vertex_segment;
@@ -340,26 +331,10 @@ struct LocalSearchData
     /** Population size. */
     int population_size;
 
-    int random_pick;
-    int start_new_trace;
-    int cycle_complete;
-    int traversal_type;
     int number_of_unbranched;
     int number_of_branching;
 
-    /** Start vertex of the AB-cycle currently being traced by 'set_ab_cycle()'/'form_ab_cycle()'. */
-    VertexId trace_start;
-
-    /** Vertex currently being visited by 'set_ab_cycle()'/'form_ab_cycle()'. */
-    VertexId trace_current_vertex;
-
-    /** Vertex visited just before 'trace_current_vertex' by 'set_ab_cycle()'/'form_ab_cycle()'. */
-    VertexId trace_previous_vertex;
-
-    int start_appearance_count;
     int number_of_ab_cycles;
-    int position_current;
-
     std::vector<VertexId> unbranched;
     std::vector<VertexId> branching;
     std::vector<int> unbranched_index;
@@ -377,9 +352,6 @@ struct LocalSearchData
     /** Number of path segments built while completing a child tour (see 'make_complete_sol()'). */
     int number_of_segments;
     int number_of_segment_positions;
-    int number_of_elements_in_center_unit;
-    int number_of_segments_for_center;
-    Distance modification_gain;
     int number_of_modified_edges;
     int number_of_best_modified_edges;
     int number_of_applied_cycles;
@@ -394,7 +366,6 @@ struct LocalSearchData
     std::vector<int> number_of_elements_in_unit;
     std::vector<int> center_unit;
     std::vector<VertexId> list_of_center_unit;
-    std::vector<int> segment_for_center;
     std::vector<Distance> gain_ab;
     std::vector<int> applied_cycle;
     std::vector<int> best_applied_cycle;
@@ -465,9 +436,6 @@ struct LocalSearchData
 
     /** Tour length of the best individual in the population. */
     Distance best_value = 0;
-
-    /** Index of the best individual in the population. */
-    int best_index = 0;
 
     /** Random pairing of the population for the current generation's crossovers. */
     std::vector<int> index_for_mating;
@@ -562,7 +530,6 @@ LocalSearchData<Distances>::LocalSearchData(
     tree_neighbors(number_of_vertices),
     segment_neighbors(number_of_vertices),
     segment_endpoints(number_of_vertices),
-    t{},
     vertex_segment(number_of_vertices),
     vertex_order(number_of_vertices),
     segment_order(number_of_vertices),
@@ -651,7 +618,6 @@ void init(
     }
 
     data.list_of_center_unit.resize(number_of_vertices + 2);
-    data.segment_for_center.resize(number_of_vertices);
     data.gain_ab.resize(number_of_vertices);
 
     data.modified_edge.clear();
@@ -797,7 +763,6 @@ void individual_to_tree(
     data.segment_neighbors[0][1] = 1;
     data.segment_neighbors[data.number_of_tree_segments - 1][0] = data.number_of_tree_segments - 2;
     data.segment_neighbors[data.number_of_tree_segments - 1][1] = 0;
-    data.tour_length = individual.length;
     data.fixed_number_of_segments = data.number_of_tree_segments;
 }
 
@@ -915,13 +880,14 @@ void merge_segments(
 /** Apply the 2-opt move found by 'optimize()' to the tree representation. */
 template <typename Distances>
 void apply_move(
-        LocalSearchData<Distances>& data)
+        LocalSearchData<Distances>& data,
+        const std::array<VertexId, 5>& t,
+        bool reversed)
 {
-    bool reversed = (data.reversed != 0);
-    VertexId t1_s = data.t[reversed? 2: 1];
-    VertexId t1_e = data.t[reversed? 4: 3];
-    VertexId t2_s = data.t[reversed? 3: 4];
-    VertexId t2_e = data.t[reversed? 1: 2];
+    VertexId t1_s = t[reversed? 2: 1];
+    VertexId t1_e = t[reversed? 4: 3];
+    VertexId t2_s = t[reversed? 3: 4];
+    VertexId t2_e = t[reversed? 1: 2];
 
     int seg_t1_s = data.vertex_segment[t1_s];
     int ordSeg_t1_s = data.segment_order[seg_t1_s];
@@ -1165,37 +1131,41 @@ template <typename Distances>
 void optimize(
         LocalSearchData<Distances>& data)
 {
+    // The four vertices involved in the move currently being considered.
+    std::array<VertexId, 5> t;
+
     std::fill(data.active.begin(), data.active.end(), 1);
     while (true) {
         // Scan the vertices cyclically, starting from a random one, until a
         // move is applied (in which case the scan restarts from a new random
         // vertex) or all the vertices have been scanned without finding any.
         VertexId t1_start = std::uniform_int_distribution<int>(0, data.number_of_vertices - 1)(data.generator);
-        data.t[1] = t1_start;
+        t[1] = t1_start;
         bool move_applied = false;
         while (!move_applied) {
-            data.t[1] = next_vertex(data, data.t[1]);
-            if (data.active[data.t[1]] != 0) {
+            t[1] = next_vertex(data, t[1]);
+            if (data.active[t[1]] != 0) {
                 // Look for an improving move, considering both the successor
-                // (reversed == 1) and the predecessor (reversed == 0) of 't[1]'.
-                for (int reversed = 0; reversed < 2 && !move_applied; ++reversed) {
-                    data.reversed = reversed;
-                    data.t[2] = (reversed == 0)?
-                        previous_vertex(data, data.t[1]):
-                        next_vertex(data, data.t[1]);
+                // (reversed) and the predecessor (not reversed) of 't[1]'.
+                for (bool reversed: {false, true}) {
+                    if (move_applied)
+                        break;
+                    t[2] = (!reversed)?
+                        previous_vertex(data, t[1]):
+                        next_vertex(data, t[1]);
                     for (int num1 = 1; num1 < data.number_of_near_vertices; ++num1) {
-                        data.t[4] = data.near_vertices[data.t[1]][num1];
-                        data.t[3] = (reversed == 0)?
-                            previous_vertex(data, data.t[4]):
-                            next_vertex(data, data.t[4]);
-                        Distance dis1 = data.distances.distance(data.t[1], data.t[2]) - data.distances.distance(data.t[1], data.t[4]);
+                        t[4] = data.near_vertices[t[1]][num1];
+                        t[3] = (!reversed)?
+                            previous_vertex(data, t[4]):
+                            next_vertex(data, t[4]);
+                        Distance dis1 = data.distances.distance(t[1], t[2]) - data.distances.distance(t[1], t[4]);
                         if (dis1 <= 0)
                             break;
-                        Distance dis2 = dis1 + data.distances.distance(data.t[3], data.t[4]) - data.distances.distance(data.t[3], data.t[2]);
+                        Distance dis2 = dis1 + data.distances.distance(t[3], t[4]) - data.distances.distance(t[3], t[2]);
                         if (dis2 > 0) {
-                            apply_move(data);
+                            apply_move(data, t, reversed);
                             for (int a = 1; a <= 4; ++a)
-                                for (VertexId near_vertex : data.inverse_near_list[data.t[a]])
+                                for (VertexId near_vertex : data.inverse_near_list[t[a]])
                                     data.active[near_vertex] = 1;
                             move_applied = true;
                             break;
@@ -1203,9 +1173,9 @@ void optimize(
                     }
                 }
                 if (!move_applied)
-                    data.active[data.t[1]] = 0;
+                    data.active[t[1]] = 0;
             }
-            if (!move_applied && data.t[1] == t1_start)
+            if (!move_applied && t[1] == t1_start)
                 return;
         }
     }
@@ -1252,18 +1222,20 @@ void make_random_solution(
 /** Record the AB-cycle currently being traced by 'set_ab_cycle()'. */
 template <typename Distances>
 void form_ab_cycle(
-        LocalSearchData<Distances>& data)
+        LocalSearchData<Distances>& data,
+        int& position_current,
+        int start_appearance_count)
 {
-    int edge_type = (data.position_current % 2 == 0)? 1: 2;
-    VertexId cycle_start = data.route[data.position_current];
+    int edge_type = (position_current % 2 == 0)? 1: 2;
+    VertexId cycle_start = data.route[position_current];
     int cycle_length = 0;
     data.cycle_buffer[cycle_length] = cycle_start;
 
     int start_count = 0;
     while (true) {
         ++cycle_length;
-        --data.position_current;
-        VertexId visiting_vertex = data.route[data.position_current];
+        --position_current;
+        VertexId visiting_vertex = data.route[position_current];
         if (data.near_data[visiting_vertex][0] == 2) {
             data.unbranched[data.unbranched_index[visiting_vertex]] = data.unbranched[data.number_of_unbranched - 1];
             data.unbranched_index[data.unbranched[data.number_of_unbranched - 1]] = data.unbranched_index[visiting_vertex];
@@ -1280,7 +1252,7 @@ void form_ab_cycle(
         --data.near_data[visiting_vertex][0];
         if (visiting_vertex == cycle_start)
             ++start_count;
-        if (start_count == data.start_appearance_count)
+        if (start_count == start_appearance_count)
             break;
         data.cycle_buffer[cycle_length] = visiting_vertex;
     }
@@ -1343,122 +1315,131 @@ void set_ab_cycle(
         data.unbranched_index[data.unbranched[i]] = i;
     }
     data.number_of_ab_cycles = 0;
-    data.start_new_trace = 1;
+
+    // State of the trace of the current AB-cycle.
+    int start_new_trace = 1;
+    int position_current = 0;
+    int start_appearance_count = 0;
+    int traversal_type = 0;
+    VertexId trace_start = -1;
+    VertexId trace_current_vertex = -1;
+    VertexId trace_previous_vertex = -1;
     while (data.number_of_unbranched != 0) {
-        if (data.start_new_trace == 1) {
-            data.position_current = 0;
-            data.random_pick = std::uniform_int_distribution<int>(0, data.number_of_unbranched - 1)(data.generator);
-            data.trace_start = data.unbranched[data.random_pick];
-            data.first_visit_position[data.trace_start] = data.position_current;
-            data.route[data.position_current] = data.trace_start;
-            data.trace_current_vertex = data.trace_start;
-            data.traversal_type = 2;
-        } else if (data.start_new_trace == 0) {
-            data.trace_current_vertex = data.route[data.position_current];
+        if (start_new_trace == 1) {
+            position_current = 0;
+            int random_pick = std::uniform_int_distribution<int>(0, data.number_of_unbranched - 1)(data.generator);
+            trace_start = data.unbranched[random_pick];
+            data.first_visit_position[trace_start] = position_current;
+            data.route[position_current] = trace_start;
+            trace_current_vertex = trace_start;
+            traversal_type = 2;
+        } else if (start_new_trace == 0) {
+            trace_current_vertex = data.route[position_current];
         }
 
-        data.cycle_complete = 0;
-        while (data.cycle_complete == 0) {
-            data.position_current++;
-            data.trace_previous_vertex = data.trace_current_vertex;
-            switch (data.traversal_type) {
+        int cycle_complete = 0;
+        while (cycle_complete == 0) {
+            position_current++;
+            trace_previous_vertex = trace_current_vertex;
+            switch (traversal_type) {
             case 1:
-                data.trace_current_vertex = data.near_data[data.trace_previous_vertex][data.position_current % 2 + 1];
+                trace_current_vertex = data.near_data[trace_previous_vertex][position_current % 2 + 1];
                 break;
-            case 2:
-                data.random_pick = std::uniform_int_distribution<int>(0, 1)(data.generator);
-                data.trace_current_vertex = data.near_data[data.trace_previous_vertex][data.position_current % 2 + 1 + 2 * data.random_pick];
-                if (data.random_pick == 0)
-                    std::swap(data.near_data[data.trace_previous_vertex][data.position_current % 2 + 1], data.near_data[data.trace_previous_vertex][data.position_current % 2 + 3]);
+            case 2: {
+                int random_pick = std::uniform_int_distribution<int>(0, 1)(data.generator);
+                trace_current_vertex = data.near_data[trace_previous_vertex][position_current % 2 + 1 + 2 * random_pick];
+                if (random_pick == 0)
+                    std::swap(data.near_data[trace_previous_vertex][position_current % 2 + 1], data.near_data[trace_previous_vertex][position_current % 2 + 3]);
                 break;
-            case 3:
-                data.trace_current_vertex = data.near_data[data.trace_previous_vertex][data.position_current % 2 + 3];
             }
-            data.route[data.position_current] = data.trace_current_vertex;
-            if (data.near_data[data.trace_current_vertex][0] == 2) {
-                if (data.trace_current_vertex == data.trace_start) {
-                    if (data.first_visit_position[data.trace_start] == 0) {
-                        if ((data.position_current - data.first_visit_position[data.trace_start]) % 2 == 0) {
-                            if (data.near_data[data.trace_start][data.position_current % 2 + 1] == data.trace_previous_vertex)
-                                std::swap(data.near_data[data.trace_current_vertex][data.position_current % 2 + 1], data.near_data[data.trace_current_vertex][data.position_current % 2 + 3]);
+            case 3:
+                trace_current_vertex = data.near_data[trace_previous_vertex][position_current % 2 + 3];
+            }
+            data.route[position_current] = trace_current_vertex;
+            if (data.near_data[trace_current_vertex][0] == 2) {
+                if (trace_current_vertex == trace_start) {
+                    if (data.first_visit_position[trace_start] == 0) {
+                        if ((position_current - data.first_visit_position[trace_start]) % 2 == 0) {
+                            if (data.near_data[trace_start][position_current % 2 + 1] == trace_previous_vertex)
+                                std::swap(data.near_data[trace_current_vertex][position_current % 2 + 1], data.near_data[trace_current_vertex][position_current % 2 + 3]);
 
-                            data.start_appearance_count = 1;
-                            form_ab_cycle(data);
+                            start_appearance_count = 1;
+                            form_ab_cycle(data, position_current, start_appearance_count);
                             if (data.eset_strategy == EsetStrategy::single_ab && data.number_of_ab_cycles == number_of_kids)
                                 return;
 
-                            data.start_new_trace = 0;
-                            data.cycle_complete = 1;
-                            data.traversal_type = 1;
+                            start_new_trace = 0;
+                            cycle_complete = 1;
+                            traversal_type = 1;
                         } else {
-                            std::swap(data.near_data[data.trace_current_vertex][data.position_current % 2 + 1], data.near_data[data.trace_current_vertex][data.position_current % 2 + 3]);
-                            data.traversal_type = 2;
+                            std::swap(data.near_data[trace_current_vertex][position_current % 2 + 1], data.near_data[trace_current_vertex][position_current % 2 + 3]);
+                            traversal_type = 2;
                         }
-                        data.first_visit_position[data.trace_start] = data.position_current;
+                        data.first_visit_position[trace_start] = position_current;
                     } else {
-                        data.start_appearance_count = 2;
-                        form_ab_cycle(data);
+                        start_appearance_count = 2;
+                        form_ab_cycle(data, position_current, start_appearance_count);
                         if (data.eset_strategy == EsetStrategy::single_ab && data.number_of_ab_cycles == number_of_kids)
                             return;
 
-                        data.start_new_trace = 1;
-                        data.cycle_complete = 1;
+                        start_new_trace = 1;
+                        cycle_complete = 1;
                     }
-                } else if (data.first_visit_position[data.trace_current_vertex] == -1) {
-                    data.first_visit_position[data.trace_current_vertex] = data.position_current;
-                    if (data.near_data[data.trace_current_vertex][data.position_current % 2 + 1] == data.trace_previous_vertex)
-                        std::swap(data.near_data[data.trace_current_vertex][data.position_current % 2 + 1], data.near_data[data.trace_current_vertex][data.position_current % 2 + 3]);
-                    data.traversal_type = 2;
-                } else if (data.first_visit_position[data.trace_current_vertex] > 0) {
-                    std::swap(data.near_data[data.trace_current_vertex][data.position_current % 2 + 1], data.near_data[data.trace_current_vertex][data.position_current % 2 + 3]);
-                    if ((data.position_current - data.first_visit_position[data.trace_current_vertex]) % 2 == 0) {
-                        data.start_appearance_count = 1;
-                        form_ab_cycle(data);
+                } else if (data.first_visit_position[trace_current_vertex] == -1) {
+                    data.first_visit_position[trace_current_vertex] = position_current;
+                    if (data.near_data[trace_current_vertex][position_current % 2 + 1] == trace_previous_vertex)
+                        std::swap(data.near_data[trace_current_vertex][position_current % 2 + 1], data.near_data[trace_current_vertex][position_current % 2 + 3]);
+                    traversal_type = 2;
+                } else if (data.first_visit_position[trace_current_vertex] > 0) {
+                    std::swap(data.near_data[trace_current_vertex][position_current % 2 + 1], data.near_data[trace_current_vertex][position_current % 2 + 3]);
+                    if ((position_current - data.first_visit_position[trace_current_vertex]) % 2 == 0) {
+                        start_appearance_count = 1;
+                        form_ab_cycle(data, position_current, start_appearance_count);
                         if (data.eset_strategy == EsetStrategy::single_ab && data.number_of_ab_cycles == number_of_kids)
                             return;
 
-                        data.start_new_trace = 0;
-                        data.cycle_complete = 1;
-                        data.traversal_type = 1;
+                        start_new_trace = 0;
+                        cycle_complete = 1;
+                        traversal_type = 1;
                     } else {
-                        std::swap(data.near_data[data.trace_current_vertex][(data.position_current + 1) % 2 + 1], data.near_data[data.trace_current_vertex][(data.position_current + 1) % 2 + 3]);
-                        data.traversal_type = 3;
+                        std::swap(data.near_data[trace_current_vertex][(position_current + 1) % 2 + 1], data.near_data[trace_current_vertex][(position_current + 1) % 2 + 3]);
+                        traversal_type = 3;
                     }
                 }
-            } else if (data.near_data[data.trace_current_vertex][0] == 1) {
-                if (data.trace_current_vertex == data.trace_start) {
-                    data.start_appearance_count = 1;
-                    form_ab_cycle(data);
+            } else if (data.near_data[trace_current_vertex][0] == 1) {
+                if (trace_current_vertex == trace_start) {
+                    start_appearance_count = 1;
+                    form_ab_cycle(data, position_current, start_appearance_count);
                     if (data.eset_strategy == EsetStrategy::single_ab && data.number_of_ab_cycles == number_of_kids)
                         return;
-                    data.start_new_trace = 1;
-                    data.cycle_complete = 1;
+                    start_new_trace = 1;
+                    cycle_complete = 1;
                 } else {
-                    data.traversal_type = 1;
+                    traversal_type = 1;
                 }
             }
         }
     }
     while (data.number_of_branching != 0) {
-        data.position_current = 0;
-        data.random_pick = std::uniform_int_distribution<int>(0, data.number_of_branching - 1)(data.generator);
-        data.trace_start = data.branching[data.random_pick];
-        data.route[data.position_current] = data.trace_start;
-        data.trace_current_vertex = data.trace_start;
+        position_current = 0;
+        int random_pick = std::uniform_int_distribution<int>(0, data.number_of_branching - 1)(data.generator);
+        trace_start = data.branching[random_pick];
+        data.route[position_current] = trace_start;
+        trace_current_vertex = trace_start;
 
-        data.cycle_complete = 0;
-        while (data.cycle_complete == 0) {
-            data.trace_previous_vertex = data.trace_current_vertex;
-            data.position_current++;
-            data.trace_current_vertex = data.near_data[data.trace_previous_vertex][data.position_current % 2 + 1];
-            data.route[data.position_current] = data.trace_current_vertex;
-            if (data.trace_current_vertex == data.trace_start) {
-                data.start_appearance_count = 1;
-                form_ab_cycle(data);
+        int cycle_complete = 0;
+        while (cycle_complete == 0) {
+            trace_previous_vertex = trace_current_vertex;
+            position_current++;
+            trace_current_vertex = data.near_data[trace_previous_vertex][position_current % 2 + 1];
+            data.route[position_current] = trace_current_vertex;
+            if (trace_current_vertex == trace_start) {
+                start_appearance_count = 1;
+                form_ab_cycle(data, position_current, start_appearance_count);
                 if (data.eset_strategy == EsetStrategy::single_ab && data.number_of_ab_cycles == number_of_kids)
                     return;
 
-                data.cycle_complete = 1;
+                cycle_complete = 1;
             }
         }
     }
@@ -1656,13 +1637,17 @@ void change_sol(
     }
 }
 
-/** The 5th step of EAX: complete the tour from the remaining path segments. */
+/**
+ * The 5th step of EAX: complete the tour from the remaining path segments.
+ *
+ * Returns the reduction in tour length (possibly negative) it causes.
+ */
 template <typename Distances>
-void make_complete_sol(
+Distance make_complete_sol(
         LocalSearchData<Distances>& data,
         Individual& child)
 {
-    data.modification_gain = 0;
+    Distance modification_gain = 0;
     while (data.number_of_units != 1) {
         int min_unit_vertex = data.number_of_vertices + 12345;
         int center_unit_index;
@@ -1673,22 +1658,20 @@ void make_complete_sol(
             }
 
         VertexId unit_start = -1;
-        data.number_of_segments_for_center = 0;
         for (int s = 0; s < data.number_of_segments; ++s)
             if (data.segment_unit[s] == center_unit_index) {
                 int posi = data.segment[s][0];
                 unit_start = data.order[posi];
-                data.segment_for_center[data.number_of_segments_for_center++] = s;
             }
         VertexId current_vertex_id = -1;
         VertexId next_vertex_id = unit_start;
-        data.number_of_elements_in_center_unit = 0;
+        int number_of_elements_in_center_unit = 0;
         while (true) {
             VertexId previous_vertex_id = current_vertex_id;
             current_vertex_id = next_vertex_id;
             data.center_unit[current_vertex_id] = 1;
-            data.list_of_center_unit[data.number_of_elements_in_center_unit] = current_vertex_id;
-            ++data.number_of_elements_in_center_unit;
+            data.list_of_center_unit[number_of_elements_in_center_unit] = current_vertex_id;
+            ++number_of_elements_in_center_unit;
             if (child.neighbors[current_vertex_id][0] != previous_vertex_id) {
                 next_vertex_id = child.neighbors[current_vertex_id][0];
             } else {
@@ -1697,8 +1680,8 @@ void make_complete_sol(
             if (next_vertex_id == unit_start)
                 break;
         }
-        data.list_of_center_unit[data.number_of_elements_in_center_unit] = data.list_of_center_unit[0];
-        data.list_of_center_unit[data.number_of_elements_in_center_unit + 1] = data.list_of_center_unit[1];
+        data.list_of_center_unit[number_of_elements_in_center_unit] = data.list_of_center_unit[0];
+        data.list_of_center_unit[number_of_elements_in_center_unit + 1] = data.list_of_center_unit[1];
 
         // Look for the best 2-opt-like move connecting the center unit to
         // another unit: first among the 10 nearest neighbors of each vertex of
@@ -1709,7 +1692,7 @@ void make_complete_sol(
         VertexId best_vertex_id_3 = -1;
         VertexId best_vertex_id_4 = -1;
         for (int near_search_limit: {10, 50}) {
-            for (int s = 1; s <= data.number_of_elements_in_center_unit; ++s) {
+            for (int s = 1; s <= number_of_elements_in_center_unit; ++s) {
                 VertexId vertex_id_1 = data.list_of_center_unit[s];
 
                 for (int near_num = 1; near_num <= std::min(near_search_limit, data.number_of_near_vertices); ++near_num) {
@@ -1746,7 +1729,7 @@ void make_complete_sol(
         }
 
         if (best_vertex_id_3 == -1) {
-            int random_center_index = std::uniform_int_distribution<int>(0, data.number_of_elements_in_center_unit - 2)(data.generator);
+            int random_center_index = std::uniform_int_distribution<int>(0, number_of_elements_in_center_unit - 2)(data.generator);
             VertexId vertex_id_1 = data.list_of_center_unit[random_center_index];
             VertexId vertex_id_2 = data.list_of_center_unit[random_center_index + 1];
             for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id) {
@@ -1788,7 +1771,7 @@ void make_complete_sol(
         data.modified_edge[data.number_of_modified_edges][3] = best_vertex_id_4;
         ++data.number_of_modified_edges;
 
-        data.modification_gain += max_diff;
+        modification_gain += max_diff;
 
         int best_position_3 = data.inverse_order[best_vertex_id_3];
         int selected_unit_index = -1;
@@ -1811,11 +1794,13 @@ void make_complete_sol(
         data.number_of_elements_in_unit[selected_unit_index] = data.number_of_elements_in_unit[data.number_of_units - 1];
         --data.number_of_units;
 
-        for (int s = 0; s < data.number_of_elements_in_center_unit; ++s) {
+        for (int s = 0; s < number_of_elements_in_center_unit; ++s) {
             VertexId vertex_id = data.list_of_center_unit[s];
             data.center_unit[vertex_id] = 0;
         }
     }
+
+    return modification_gain;
 }
 
 /** The 5-1th step of EAX: group path segments into units. */
@@ -2304,8 +2289,8 @@ void search_eset(
         int jnum = data.ab_cycle_in_eset[s];
         add_ab(data, jnum);
     }
-    data.best_number_of_c_nodes = data.number_of_c_nodes;
-    data.best_number_of_e_edges = data.number_of_e_edges;
+    int best_number_of_c_nodes = data.number_of_c_nodes;
+    int best_number_of_e_edges = data.number_of_e_edges;
 
     int stagnation = 0;
     int iteration = 0;
@@ -2319,10 +2304,10 @@ void search_eset(
         for (int s1 = 0; s1 < data.number_of_ab_cycles; ++s1) {
             if (data.used_ab_cycle[s1] == 0 && data.weight_sr[s1] > 0) {
                 int delta_weight = data.weight_c[s1] - 2 * data.weight_sr[s1];
-                if (data.number_of_c_nodes + delta_weight < data.best_number_of_c_nodes) {
+                if (data.number_of_c_nodes + delta_weight < best_number_of_c_nodes) {
                     selected_ab_cycle = s1;
                     improving_change = 1;
-                    data.best_number_of_c_nodes = data.number_of_c_nodes + delta_weight;
+                    best_number_of_c_nodes = data.number_of_c_nodes + delta_weight;
                 }
                 if (delta_weight < min_delta_weight_non_tabu && iteration > data.moved_ab_cycle[s1]) {
                     selected_ab_cycle_non_tabu = s1;
@@ -2331,10 +2316,10 @@ void search_eset(
                 }
             } else if (data.used_ab_cycle[s1] == 1 && s1 != center_ab) {
                 int delta_weight = - data.weight_c[s1] + 2 * data.weight_sr[s1];
-                if (data.number_of_c_nodes + delta_weight < data.best_number_of_c_nodes) {
+                if (data.number_of_c_nodes + delta_weight < best_number_of_c_nodes) {
                     selected_ab_cycle = s1;
                     improving_change = -1;
-                    data.best_number_of_c_nodes = data.number_of_c_nodes + delta_weight;
+                    best_number_of_c_nodes = data.number_of_c_nodes + delta_weight;
                 }
                 if (delta_weight < min_delta_weight_non_tabu && iteration > data.moved_ab_cycle[s1]) {
                     selected_ab_cycle_non_tabu = s1;
@@ -2353,7 +2338,7 @@ void search_eset(
 
             data.moved_ab_cycle[selected_ab_cycle] = iteration + std::uniform_int_distribution<int>(1, data.t_max)(data.generator);
 
-            data.best_number_of_e_edges = data.number_of_e_edges;
+            best_number_of_e_edges = data.number_of_e_edges;
 
             data.number_of_ab_cycles_in_eset = 0;
             for (int s1 = 0; s1 < data.number_of_ab_cycles; ++s1)
@@ -2447,8 +2432,7 @@ void run_cross(
         }
 
         make_unit(data);
-        make_complete_sol(data, child);
-        gain += data.modification_gain;
+        gain += make_complete_sol(data, child);
 
         ++data.number_of_generated_children;
 
@@ -2568,16 +2552,16 @@ void set_average_best(
 {
     Distance stock_best = data.best_individual.length;
     data.average_value = 0.0;
-    data.best_index = 0;
+    int best_index = 0;
     data.best_value = data.population[0].length;
     for (int i = 0; i < data.population_size; ++i) {
         data.average_value += data.population[i].length;
         if (data.population[i].length < data.best_value) {
-            data.best_index = i;
+            best_index = i;
             data.best_value = data.population[i].length;
         }
     }
-    data.best_individual = data.population[data.best_index];
+    data.best_individual = data.population[best_index];
     data.average_value /= (double)data.population_size;
     if (data.best_individual.length < stock_best) {
         data.stagnation_count = 0;
