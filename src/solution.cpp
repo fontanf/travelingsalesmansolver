@@ -1,14 +1,13 @@
 #include "travelingsalesmansolver/solution.hpp"
 
+#include "travelingsalesmansolver/solution_builder.hpp"
+
 using namespace travelingsalesmansolver;
 
 Solution::Solution(const Instance& instance):
     instance_(&instance),
-    vertices_is_visited_(instance.number_of_vertices(), false)
+    vertex_ids_({0})
 {
-    // Add initial vertex.
-    vertex_ids_.push_back(0);
-    vertices_is_visited_[0] = true;
 }
 
 Solution::Solution(
@@ -18,13 +17,9 @@ Solution::Solution(
 {
     if (certificate_path.empty())
         return;
-    std::ifstream file(certificate_path);
-    if (!file.good()) {
-        throw std::runtime_error(
-                "Unable to open file \"" + certificate_path + "\".");
-    }
-
-    // TODO
+    SolutionBuilder solution_builder(instance);
+    solution_builder.read(certificate_path);
+    *this = solution_builder.build();
 }
 
 bool Solution::feasible() const
