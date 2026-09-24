@@ -1,6 +1,6 @@
 #pragma once
 
-#include "travelingsalesmansolver/solution.hpp"
+#include "travelingsalesmansolver/solution_builder.hpp"
 #include "travelingsalesmansolver/algorithm_formatter.hpp"
 #include "travelingsalesmansolver/distances/ball_tree.hpp"
 
@@ -714,9 +714,8 @@ Solution to_solution(
         const LocalSearchData<Distances>& data,
         const LocalSearchSolution& local_search_solution)
 {
-    // 'Solution' already starts at vertex 0, so it must not be added again
-    // here.
-    Solution solution(data.instance);
+    SolutionBuilder solution_builder(data.instance);
+    solution_builder.add_vertex(0);
     VertexId current_vertex_id = 0;
     VertexId start_vertex_id = 0;
     VertexId previous_vertex_id = -1;
@@ -728,9 +727,9 @@ Solution to_solution(
         current_vertex_id = next_vertex_id;
         if (current_vertex_id == start_vertex_id)
             break;
-        solution.add_vertex(data.distances, current_vertex_id);
+        solution_builder.add_vertex(current_vertex_id);
     }
-    return solution;
+    return solution_builder.build();
 }
 
 /** Build the tree representation of 'solution'. */
