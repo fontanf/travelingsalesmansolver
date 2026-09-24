@@ -76,14 +76,16 @@ struct LkhOutput: Output
 
 const LkhOutput lkh(
         const Instance& instance,
-        const LkhParameters& parameters = {});
+        const LkhParameters& parameters = {},
+        const Solution* initial_solution = nullptr);
 
 
 template <typename Distances>
 const LkhOutput lkh(
         const Distances& distances,
         const Instance& instance,
-        const LkhParameters& parameters = {});
+        const LkhParameters& parameters = {},
+        const Solution* initial_solution = nullptr);
 
 struct LkhCandidateEdge
 {
@@ -118,8 +120,15 @@ template <typename Distances>
 const LkhOutput lkh(
         const Distances& distances,
         const Instance& instance,
-        const LkhParameters& parameters)
+        const LkhParameters& parameters,
+        const Solution* initial_solution)
 {
+    if (initial_solution != nullptr && !initial_solution->feasible()) {
+        throw std::invalid_argument(
+                "travelingsalesmansolver::lkh: "
+                "the initial solution must be feasible.");
+    }
+
     LkhOutput output(instance);
     AlgorithmFormatter algorithm_formatter(parameters, output);
     algorithm_formatter.start("LKH");
@@ -171,6 +180,30 @@ const LkhOutput lkh(
         }
         candidate_file << parameters.candidate_file_content;
     }
+
+    // Initial tour file.
+    char initial_tour_path[L_tmpnam];
+    initial_tour_path[0] = '\0';
+    if (initial_solution != nullptr) {
+        tmpnam(initial_tour_path);
+        parameters_file << "INITIAL_TOUR_FILE = " << initial_tour_path << std::endl;
+        std::ofstream initial_tour_file(initial_tour_path);
+        if (!initial_tour_file.good()) {
+            throw std::runtime_error(
+                    "Unable to open file \"" + std::string(initial_tour_path) + "\".");
+        }
+        initial_tour_file
+            << "TYPE : TOUR" << std::endl
+            << "DIMENSION : " << initial_solution->number_of_vertices() << std::endl
+            << "TOUR_SECTION" << std::endl;
+        for (VertexPos pos = 0;
+                pos < initial_solution->number_of_vertices();
+                ++pos) {
+            initial_tour_file << initial_solution->vertex_id(pos) + 1 << std::endl;
+        }
+        initial_tour_file << "-1" << std::endl << "EOF" << std::endl;
+    }
+    parameters_file.close();
 
     // Run.
     char output_path[L_tmpnam];
@@ -225,6 +258,8 @@ const LkhOutput lkh(
     std::remove(solution_path);
     std::remove(output_path);
     std::remove(candidate_path);
+    if (initial_solution != nullptr)
+        std::remove(initial_tour_path);
 
     // Update output.
     algorithm_formatter.update_solution(solution, "Final solution");

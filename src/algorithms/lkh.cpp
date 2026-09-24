@@ -4,13 +4,15 @@ using namespace travelingsalesmansolver;
 
 const LkhOutput travelingsalesmansolver::lkh(
         const Instance& instance,
-        const LkhParameters& parameters)
+        const LkhParameters& parameters,
+        const Solution* initial_solution)
 {
     return FUNCTION_WITH_DISTANCES(
             lkh,
             instance.distances(),
             instance,
-            parameters);
+            parameters,
+            initial_solution);
 }
 
 std::vector<LkhCandidate> travelingsalesmansolver::read_candidates(
