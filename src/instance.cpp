@@ -125,39 +125,63 @@ std::pair<bool, Distance> Instance::check(
             << std::endl;
     }
 
-    VertexId vertex_id_pred = 0;
+    // Vertex ids are 1-based, as written by 'Solution::write'. The tour is
+    // closed by going back from the last vertex to the first one.
+    VertexId vertex_id_first = -1;
+    VertexId vertex_id_pred = -1;
     VertexId vertex_id = -1;
     optimizationtools::IndexedSet vertices(number_of_vertices());
-    vertices.add(0);
+    VertexPos number_of_invalid_ids = 0;
     VertexPos number_of_duplicates = 0;
     Distance total_distance = 0;
     while (file >> vertex_id) {
+
+        // Check the id.
+        if (vertex_id < 1 || vertex_id > number_of_vertices()) {
+            number_of_invalid_ids++;
+            if (verbosity_level >= 2) {
+                os << "Vertex id " << vertex_id
+                    << " is invalid." << std::endl;
+            }
+            continue;
+        }
+        vertex_id--;
 
         // Check duplicates.
         if (vertices.contains(vertex_id)) {
             number_of_duplicates++;
             if (verbosity_level >= 2) {
-                os << "Vertex " << vertex_id
+                os << "Vertex " << vertex_id + 1
                     << " has already been visited." << std::endl;
             }
         }
         vertices.add(vertex_id);
 
-        total_distance += distances.distance(vertex_id_pred, vertex_id);
+        if (vertex_id_pred == -1) {
+            vertex_id_first = vertex_id;
+        } else {
+            total_distance += distances.distance(vertex_id_pred, vertex_id);
+        }
 
         if (verbosity_level >= 2) {
             os
-                << std::setw(12) << vertex_id
+                << std::setw(12) << vertex_id + 1
                 << std::setw(12) << total_distance
                 << std::endl;
         }
 
         vertex_id_pred = vertex_id;
     }
-    total_distance += distances.distance(vertex_id_pred, 0);
+    if (!file.eof()) {
+        throw std::runtime_error(
+                "Unable to parse certificate \"" + certificate_path + "\".");
+    }
+    if (vertex_id_pred != -1)
+        total_distance += distances.distance(vertex_id_pred, vertex_id_first);
 
     bool feasible
         = (vertices.size() == number_of_vertices())
+        && (number_of_invalid_ids == 0)
         && (number_of_duplicates == 0);
 
     if (verbosity_level >= 2)
@@ -165,6 +189,7 @@ std::pair<bool, Distance> Instance::check(
     if (verbosity_level >= 1) {
         os
             << "Number of vertices:     " << vertices.size() << " / " << number_of_vertices()  << std::endl
+            << "Number of invalid ids:  " << number_of_invalid_ids << std::endl
             << "Number of duplicates:   " << number_of_duplicates << std::endl
             << "Feasible:               " << feasible << std::endl
             << "Total distance:         " << total_distance << std::endl

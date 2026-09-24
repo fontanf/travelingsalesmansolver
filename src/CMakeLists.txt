@@ -4,6 +4,7 @@ add_library(TravelingSalesmanSolver_traveling_salesman)
 target_sources(TravelingSalesmanSolver_traveling_salesman PRIVATE
     instance.cpp
     solution.cpp
+    solution_builder.cpp
     algorithm_formatter.cpp)
 target_include_directories(TravelingSalesmanSolver_traveling_salesman PUBLIC
     ${PROJECT_SOURCE_DIR}/include)

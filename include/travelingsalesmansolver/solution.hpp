@@ -59,16 +59,6 @@ public:
     bool feasible() const;
 
     /*
-     * Setters
-     */
-
-    /** Append a vertex at the end of the solution. */
-    template <typename Distances>
-    void add_vertex(
-            const Distances& distances,
-            VertexId vertex_id);
-
-    /*
      * Export
      */
 
@@ -97,24 +87,13 @@ private:
     std::vector<VertexId> vertex_ids_;
 
     /**
-     * Array indexed by vertices indicating whether of not they have been
-     * visited.
-     */
-    std::vector<uint8_t> vertices_is_visited_;
-
-    /**
-     * Travelled distance.
-     *
-     * This time doesn't take into account the return to the depot.
-     */
-    Distance distance_cur_ = 0;
-
-    /**
      * Full travelled distance.
      *
      * This time takes into account the return to the depot.
      */
     Distance distance_ = 0;
+
+    friend class SolutionBuilder;
 
 };
 
@@ -222,22 +201,5 @@ struct Parameters: optimizationtools::Parameters
         //int width = format_width();
     }
 };
-
-template <typename Distances>
-void Solution::add_vertex(
-        const Distances& distances,
-        VertexId vertex_id)
-{
-    // Check that the vertex has not already been visited.
-    if (vertices_is_visited_[vertex_id]) {
-        throw std::runtime_error("");  // TODO
-    }
-
-    VertexId vertex_id_prev = vertex_ids_.back();
-    vertex_ids_.push_back(vertex_id);
-    vertices_is_visited_[vertex_id] = true;
-    distance_cur_ += distances.distance(vertex_id_prev, vertex_id);
-    distance_ = distance_cur_ + distances.distance(vertex_id, 0);
-}
 
 }
