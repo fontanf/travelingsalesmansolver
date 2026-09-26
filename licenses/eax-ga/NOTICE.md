@@ -26,7 +26,7 @@ Changes made to the original source:
   that flow from them, `TKopt::fTourLength` and its `dis1`/`dis2` locals,
   `TEnvironment::fBestValue`) is now the shared `Distance` (`int64_t`)
   type, so distances scaled well beyond a 32-bit `int`'s range (e.g. the
-  minmax mTSP paper's unrounded-`EUC_2D` convention, scaled by `1e6`) work
+  minmax mTSP paper's unrounded Euclidean convention, `EUC_2D` scaled by `1e6`) work
   correctly without the caller needing to know a scale exists at all.
   `TEvaluator`'s original file-based `setInstance(filename)` (reading a
   TSPLIB file and computing its own `EUC_2D`/`ATT`/`CEIL_2D` distances from
