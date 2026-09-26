@@ -4,6 +4,7 @@
 #include "travelingsalesmansolver/distances/distances_explicit_triangle.hpp"
 #include "travelingsalesmansolver/distances/distances_euc_2d.hpp"
 #include "travelingsalesmansolver/distances/distances_ceil_2d.hpp"
+#include "travelingsalesmansolver/distances/distances_floor_2d.hpp"
 #include "travelingsalesmansolver/distances/distances_man_2d.hpp"
 #include "travelingsalesmansolver/distances/distances_geo.hpp"
 #include "travelingsalesmansolver/distances/distances_att.hpp"
@@ -27,6 +28,8 @@ namespace travelingsalesmansolver
     (function)(*(distances).distances_euc_2d()): \
     ((distances).distances_ceil_2d() != nullptr)? \
     (function)(*(distances).distances_ceil_2d()): \
+    ((distances).distances_floor_2d() != nullptr)? \
+    (function)(*(distances).distances_floor_2d()): \
     ((distances).distances_man_2d() != nullptr)? \
     (function)(*(distances).distances_man_2d()): \
     ((distances).distances_geo() != nullptr)? \
@@ -42,6 +45,8 @@ namespace travelingsalesmansolver
     (function)(*(distances).distances_euc_2d(), __VA_ARGS__): \
     ((distances).distances_ceil_2d() != nullptr)? \
     (function)(*(distances).distances_ceil_2d(), __VA_ARGS__): \
+    ((distances).distances_floor_2d() != nullptr)? \
+    (function)(*(distances).distances_floor_2d(), __VA_ARGS__): \
     ((distances).distances_man_2d() != nullptr)? \
     (function)(*(distances).distances_man_2d(), __VA_ARGS__): \
     ((distances).distances_geo() != nullptr)? \
@@ -53,6 +58,8 @@ namespace travelingsalesmansolver
     (function)(*(distances).distances_euc_2d()): \
     ((distances).distances_ceil_2d() != nullptr)? \
     (function)(*(distances).distances_ceil_2d()): \
+    ((distances).distances_floor_2d() != nullptr)? \
+    (function)(*(distances).distances_floor_2d()): \
     ((distances).distances_man_2d() != nullptr)? \
     (function)(*(distances).distances_man_2d()): \
     ((distances).distances_geo() != nullptr)? \
@@ -68,6 +75,8 @@ namespace travelingsalesmansolver
     (function)(*(distances).distances_euc_2d(), __VA_ARGS__): \
     ((distances).distances_ceil_2d() != nullptr)? \
     (function)(*(distances).distances_ceil_2d(), __VA_ARGS__): \
+    ((distances).distances_floor_2d() != nullptr)? \
+    (function)(*(distances).distances_floor_2d(), __VA_ARGS__): \
     ((distances).distances_man_2d() != nullptr)? \
     (function)(*(distances).distances_man_2d(), __VA_ARGS__): \
     ((distances).distances_geo() != nullptr)? \
@@ -116,6 +125,8 @@ public:
     const DistancesEuc2D* distances_euc_2d() const { return distances_euc_2d_.get(); }
 
     const DistancesCeil2D* distances_ceil_2d() const { return distances_ceil_2d_.get(); }
+
+    const DistancesFloor2D* distances_floor_2d() const { return distances_floor_2d_.get(); }
 
     const DistancesMan2D* distances_man_2d() const { return distances_man_2d_.get(); }
 
@@ -177,6 +188,8 @@ private:
     std::unique_ptr<const DistancesEuc2D> distances_euc_2d_ = nullptr;
 
     std::unique_ptr<const DistancesCeil2D> distances_ceil_2d_ = nullptr;
+
+    std::unique_ptr<const DistancesFloor2D> distances_floor_2d_ = nullptr;
 
     std::unique_ptr<const DistancesMan2D> distances_man_2d_ = nullptr;
 

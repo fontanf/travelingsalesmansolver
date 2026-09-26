@@ -11,7 +11,7 @@ namespace travelingsalesmansolver
  * distances.
  *
  * The concrete representation is adapted to the input's: coordinate-based
- * types (Euc2D, Ceil2D, Man2D, Geo, Att) produce a distances
+ * types (Euc2D, Ceil2D, Floor2D, Man2D, Geo, Att) produce a distances
  * object of that same type, holding only the 'vertex_ids.size()' selected
  * vertices' coordinates (O(k), no distance ever computed or stored);
  * explicit distances (Explicit, ExplicitTriangle) have no coordinates to
