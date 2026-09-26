@@ -16,6 +16,9 @@ bool DistancesBuilder::read_tsplib(
     } else if (tmp.rfind("NODE_COORD_TYPE", 0) == 0) {
         node_coord_type_ = line.back();
 
+    } else if (tmp.rfind("SCALE", 0) == 0) {
+        scale_ = std::stol(line.back());
+
     } else if (tmp.rfind("EDGE_WEIGHT_SECTION", 0) == 0) {
         if (edge_weight_format_ == "UPPER_ROW") {
             DistancesExplicitTriangleBuilder distances_explicit_triangle_builder;
@@ -129,6 +132,7 @@ bool DistancesBuilder::read_tsplib(
             if (edge_weight_type_ == "EUC_2D") {
                 DistancesEuc2DBuilder distances_euc_2d_builder;
                 distances_euc_2d_builder.set_number_of_vertices(distances_.number_of_vertices_);
+                distances_euc_2d_builder.set_scale(scale_);
                 for (VertexId vertex_id = 0;
                         vertex_id < distances_.number_of_vertices_;
                         ++vertex_id) {
@@ -261,6 +265,7 @@ void DistancesBuilder::read_json(const nlohmann::json& json)
     } else if (type == "euc_2d") {
         DistancesEuc2DBuilder distances_euc_2d_builder;
         distances_euc_2d_builder.set_number_of_vertices(number_of_vertices);
+        distances_euc_2d_builder.set_scale(json.value("scale", (Distance)1));
         for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
             distances_euc_2d_builder.set_coordinates(
                     vertex_id,
@@ -268,17 +273,6 @@ void DistancesBuilder::read_json(const nlohmann::json& json)
                     json["coordinates"][vertex_id][1].get<double>());
         }
         set_distances_euc_2d(distances_euc_2d_builder.build());
-
-    } else if (type == "euc_2d_unrounded") {
-        DistancesEuc2DUnroundedBuilder distances_euc_2d_unrounded_builder;
-        distances_euc_2d_unrounded_builder.set_number_of_vertices(number_of_vertices);
-        for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
-            distances_euc_2d_unrounded_builder.set_coordinates(
-                    vertex_id,
-                    json["coordinates"][vertex_id][0].get<double>(),
-                    json["coordinates"][vertex_id][1].get<double>());
-        }
-        set_distances_euc_2d_unrounded(distances_euc_2d_unrounded_builder.build());
 
     } else if (type == "ceil_2d") {
         DistancesCeil2DBuilder distances_ceil_2d_builder;

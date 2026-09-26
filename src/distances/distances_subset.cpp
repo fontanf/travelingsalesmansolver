@@ -58,6 +58,7 @@ Distances distances_subset_impl(
     VertexId number_of_vertices = (VertexId)vertex_ids.size();
     DistancesEuc2DBuilder distances_euc_2d_builder;
     distances_euc_2d_builder.set_number_of_vertices(number_of_vertices);
+    distances_euc_2d_builder.set_scale(distances.scale());
     for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
         const Coordinates2D& coordinates = distances.coordinates(vertex_ids[vertex_id]);
         distances_euc_2d_builder.set_coordinates(vertex_id, coordinates.x, coordinates.y);
@@ -65,23 +66,6 @@ Distances distances_subset_impl(
     DistancesBuilder distances_builder;
     distances_builder.set_number_of_vertices(number_of_vertices);
     distances_builder.set_distances_euc_2d(distances_euc_2d_builder.build());
-    return distances_builder.build();
-}
-
-Distances distances_subset_impl(
-        const DistancesEuc2DUnrounded& distances,
-        const std::vector<VertexId>& vertex_ids)
-{
-    VertexId number_of_vertices = (VertexId)vertex_ids.size();
-    DistancesEuc2DUnroundedBuilder distances_euc_2d_unrounded_builder;
-    distances_euc_2d_unrounded_builder.set_number_of_vertices(number_of_vertices);
-    for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
-        const Coordinates2D& coordinates = distances.coordinates(vertex_ids[vertex_id]);
-        distances_euc_2d_unrounded_builder.set_coordinates(vertex_id, coordinates.x, coordinates.y);
-    }
-    DistancesBuilder distances_builder;
-    distances_builder.set_number_of_vertices(number_of_vertices);
-    distances_builder.set_distances_euc_2d_unrounded(distances_euc_2d_unrounded_builder.build());
     return distances_builder.build();
 }
 

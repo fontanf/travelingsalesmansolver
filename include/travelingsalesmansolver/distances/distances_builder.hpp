@@ -66,17 +66,6 @@ public:
         set_ = true;
     }
 
-    /** Set unrounded Euc2D distances. */
-    void set_distances_euc_2d_unrounded(
-            const DistancesEuc2DUnrounded& distances_euc_2d_unrounded)
-    {
-        if (set_) {
-            throw std::invalid_argument("Distances has already been set.");
-        }
-        distances_.distances_euc_2d_unrounded_ = std::make_unique<const DistancesEuc2DUnrounded>(distances_euc_2d_unrounded);
-        set_ = true;
-    }
-
     /** Set Ceil2D distances. */
     void set_distances_ceil_2d(
             const DistancesCeil2D& distances_ceil_2d)
@@ -144,6 +133,9 @@ private:
     std::string edge_weight_format_ = "";
 
     std::string node_coord_type_ = "TWOD_COORDS";
+
+    /** 'SCALE' keyword (LKH extension of TSPLIB), only used by 'EUC_2D'. */
+    Distance scale_ = 1;
 
 };
 
