@@ -156,6 +156,20 @@ bool DistancesBuilder::read_tsplib(
                 }
                 set_distances_ceil_2d(distances_ceil_2d_builder.build());
 
+            } else if (edge_weight_type_ == "FLOOR_2D") {
+                DistancesFloor2DBuilder distances_floor_2d_builder;
+                distances_floor_2d_builder.set_number_of_vertices(distances_.number_of_vertices_);
+                distances_floor_2d_builder.set_scale(scale_);
+                for (VertexId vertex_id = 0;
+                        vertex_id < distances_.number_of_vertices_;
+                        ++vertex_id) {
+                    distances_floor_2d_builder.set_coordinates(
+                            vertex_id,
+                            coordinates_2d[vertex_id].x,
+                            coordinates_2d[vertex_id].y);
+                }
+                set_distances_floor_2d(distances_floor_2d_builder.build());
+
             } else if (edge_weight_type_ == "MAN_2D") {
                 DistancesMan2DBuilder distances_man_2d_builder;
                 distances_man_2d_builder.set_number_of_vertices(distances_.number_of_vertices_);
@@ -284,6 +298,18 @@ void DistancesBuilder::read_json(const nlohmann::json& json)
                     json["coordinates"][vertex_id][1].get<double>());
         }
         set_distances_ceil_2d(distances_ceil_2d_builder.build());
+
+    } else if (type == "floor_2d") {
+        DistancesFloor2DBuilder distances_floor_2d_builder;
+        distances_floor_2d_builder.set_number_of_vertices(number_of_vertices);
+        distances_floor_2d_builder.set_scale(json.value("scale", (Distance)1));
+        for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
+            distances_floor_2d_builder.set_coordinates(
+                    vertex_id,
+                    json["coordinates"][vertex_id][0].get<double>(),
+                    json["coordinates"][vertex_id][1].get<double>());
+        }
+        set_distances_floor_2d(distances_floor_2d_builder.build());
 
     } else if (type == "man_2d") {
         DistancesMan2DBuilder distances_man_2d_builder;

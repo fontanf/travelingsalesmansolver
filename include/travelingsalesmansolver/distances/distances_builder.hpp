@@ -77,6 +77,17 @@ public:
         set_ = true;
     }
 
+    /** Set Floor2D distances. */
+    void set_distances_floor_2d(
+            const DistancesFloor2D& distances_floor_2d)
+    {
+        if (set_) {
+            throw std::invalid_argument("Distances has already been set.");
+        }
+        distances_.distances_floor_2d_ = std::make_unique<const DistancesFloor2D>(distances_floor_2d);
+        set_ = true;
+    }
+
     /** Set Man2D distances. */
     void set_distances_man_2d(
             const DistancesMan2D& distances_man_2d)
@@ -134,7 +145,7 @@ private:
 
     std::string node_coord_type_ = "TWOD_COORDS";
 
-    /** 'SCALE' keyword (LKH extension of TSPLIB), only used by 'EUC_2D'. */
+    /** 'SCALE' keyword (LKH extension of TSPLIB), only used by 'EUC_2D' and 'FLOOR_2D'. */
     Distance scale_ = 1;
 
 };
