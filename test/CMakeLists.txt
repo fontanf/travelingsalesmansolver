@@ -1,0 +1,28 @@
+enable_testing()
+include(GoogleTest)
+
+add_executable(TravelingSalesmanSolver_two_level_list_test)
+target_sources(TravelingSalesmanSolver_two_level_list_test PRIVATE
+    lin_kernighan/two_level_list_test.cpp)
+target_include_directories(TravelingSalesmanSolver_two_level_list_test PRIVATE
+    ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(TravelingSalesmanSolver_two_level_list_test
+    GTest::gtest_main)
+gtest_discover_tests(TravelingSalesmanSolver_two_level_list_test)
+
+add_executable(TravelingSalesmanSolver_k_opt_move_test)
+target_sources(TravelingSalesmanSolver_k_opt_move_test PRIVATE
+    lin_kernighan/k_opt_move_test.cpp)
+target_include_directories(TravelingSalesmanSolver_k_opt_move_test PRIVATE
+    ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(TravelingSalesmanSolver_k_opt_move_test
+    GTest::gtest_main)
+gtest_discover_tests(TravelingSalesmanSolver_k_opt_move_test)
+
+add_executable(TravelingSalesmanSolver_tour_merging_test)
+target_sources(TravelingSalesmanSolver_tour_merging_test PRIVATE
+    lin_kernighan/tour_merging_test.cpp)
+target_link_libraries(TravelingSalesmanSolver_tour_merging_test
+    TravelingSalesmanSolver_distances
+    GTest::gtest_main)
+gtest_discover_tests(TravelingSalesmanSolver_tour_merging_test)
