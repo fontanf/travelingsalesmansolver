@@ -1,5 +1,6 @@
 #include "travelingsalesmansolver/algorithms/lkh.hpp"
 #include "travelingsalesmansolver/algorithms/concorde.hpp"
+#include "travelingsalesmansolver/algorithms/lin_kernighan.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -62,6 +63,24 @@ Output run(
         read_args(parameters, vm);
         return concorde(instance, parameters);
 
+    } else if (algorithm == "lin-kernighan") {
+        LinKernighanParameters parameters;
+        read_args(parameters, vm);
+        parameters.seed = vm["seed"].as<Seed>();
+        if (vm.count("number-of-candidates"))
+            parameters.number_of_candidates = vm["number-of-candidates"].as<VertexId>();
+        if (vm.count("maximum-depth"))
+            parameters.maximum_depth = vm["maximum-depth"].as<int>();
+        if (vm.count("move-type"))
+            parameters.move_type = vm["move-type"].as<int>();
+        if (vm.count("restricted-search"))
+            parameters.restricted_search = vm["restricted-search"].as<bool>();
+        if (vm.count("perturbation"))
+            parameters.perturbation = vm["perturbation"].as<std::string>();
+        if (vm.count("maximum-number-of-kicks"))
+            parameters.maximum_number_of_kicks = vm["maximum-number-of-kicks"].as<int64_t>();
+        return lin_kernighan(instance, parameters);
+
     } else {
         throw std::invalid_argument(
                 "Unknown algorithm \"" + algorithm + "\".");
@@ -92,6 +111,13 @@ int main(int argc, char *argv[])
         ("initial-period,", po::value<std::string>(), "set initial period")
         ("runs,", po::value<std::string>(), "set runs")
         ("max-trials,", po::value<std::string>(), "set max trials")
+
+        ("number-of-candidates,", po::value<VertexId>(), "set number of candidates (lin-kernighan)")
+        ("maximum-number-of-kicks,", po::value<int64_t>(), "set maximum number of kicks (lin-kernighan)")
+        ("move-type,", po::value<int>(), "set move type: 2 (chained LK) to 5 (LKH-style 5-opt steps) (lin-kernighan)")
+        ("perturbation,", po::value<std::string>(), "set perturbation: kicks or trials (lin-kernighan)")
+        ("restricted-search,", po::value<bool>(), "set restricted search (lin-kernighan)")
+        ("maximum-depth,", po::value<int>(), "set maximum number of steps in a chain (lin-kernighan)")
         ;
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);

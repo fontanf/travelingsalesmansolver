@@ -15,3 +15,12 @@ target_include_directories(TravelingSalesmanSolver_lkh PUBLIC
 target_link_libraries(TravelingSalesmanSolver_lkh PUBLIC
     TravelingSalesmanSolver_traveling_salesman)
 add_library(TravelingSalesmanSolver::lkh ALIAS TravelingSalesmanSolver_lkh)
+
+add_library(TravelingSalesmanSolver_lin_kernighan)
+target_sources(TravelingSalesmanSolver_lin_kernighan PRIVATE
+    lin_kernighan.cpp)
+target_include_directories(TravelingSalesmanSolver_lin_kernighan PUBLIC
+    ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(TravelingSalesmanSolver_lin_kernighan PUBLIC
+    TravelingSalesmanSolver_traveling_salesman)
+add_library(TravelingSalesmanSolver::lin_kernighan ALIAS TravelingSalesmanSolver_lin_kernighan)
