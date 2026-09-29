@@ -909,7 +909,8 @@ bool improve(
                 improved = true;
                 break;
             }
-            if (!engine.has_best)
+            // (Not at the last step: the move would be undone.)
+            if (!engine.has_best || step + 1 == engine.parameters.maximum_depth)
                 break;
             // Apply the best non-improving move, and continue from it.
             engine.sequential_move.analyze(engine.tour, engine.best_t.data(), k);
