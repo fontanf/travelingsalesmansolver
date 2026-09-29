@@ -10,7 +10,7 @@ namespace travelingsalesmansolver
 
 struct LinKernighanParameters: Parameters
 {
-    /** Number of candidate edges per vertex (nearest neighbors). */
+    /** Number of candidate edges per vertex (nearest neighbors), if no candidates are given. */
     VertexId number_of_candidates = 10;
 
     /**
@@ -85,18 +85,24 @@ struct LinKernighanParameters: Parameters
  *
  * 'initial_solution', if provided, is the initial tour (a 'greedy' tour is
  * built otherwise). It must be a feasible solution of the same 'instance'.
+ *
+ * 'candidates', if provided, are the candidate edges of each vertex, best
+ * first (e.g. 'alpha_nearness_candidates'); otherwise, the
+ * 'parameters.number_of_candidates' nearest neighbors.
  */
 const Output lin_kernighan(
         const Instance& instance,
         const LinKernighanParameters& parameters = {},
-        const Solution* initial_solution = nullptr);
+        const Solution* initial_solution = nullptr,
+        const CandidateLists* candidates = nullptr);
 
 template <typename Distances>
 const Output lin_kernighan(
         const Distances& distances,
         const Instance& instance,
         const LinKernighanParameters& parameters = {},
-        const Solution* initial_solution = nullptr);
+        const Solution* initial_solution = nullptr,
+        const CandidateLists* candidates = nullptr);
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -156,12 +162,19 @@ const Output lin_kernighan(
         const Distances& distances,
         const Instance& instance,
         const LinKernighanParameters& parameters,
-        const Solution* initial_solution)
+        const Solution* initial_solution,
+        const CandidateLists* candidates)
 {
     Output output(instance);
     AlgorithmFormatter algorithm_formatter(parameters, output);
     algorithm_formatter.start("Lin-Kernighan");
     algorithm_formatter.print_header();
+
+    CandidateLists candidate_lists = (candidates != nullptr)?
+        *candidates:
+        nearest_neighbor_candidates(
+                instance.distances(),
+                parameters.number_of_candidates);
 
     std::vector<VertexId> initial_tour;
     if (initial_solution != nullptr) {
@@ -171,14 +184,10 @@ const Output lin_kernighan(
         GreedyParameters greedy_parameters;
         greedy_parameters.verbosity_level = 0;
         greedy_parameters.number_of_candidates = parameters.number_of_candidates;
-        Output greedy_output = greedy(distances, instance, greedy_parameters);
+        Output greedy_output = greedy(distances, instance, greedy_parameters, &candidate_lists);
         for (VertexId pos = 0; pos < greedy_output.solution.number_of_vertices(); ++pos)
             initial_tour.push_back(greedy_output.solution.vertex_id(pos));
     }
-    CandidateLists candidates = nearest_neighbor_candidates(
-            instance.distances(),
-            parameters.number_of_candidates);
-
     lin_kernighan_engine::EngineParameters engine_parameters;
     engine_parameters.move_type = parameters.move_type;
     engine_parameters.maximum_depth = parameters.maximum_depth;
@@ -191,7 +200,7 @@ const Output lin_kernighan(
     engine_parameters.needs_to_end = [&parameters]() { return parameters.timer.needs_to_end(); };
 
     LinKernighanTspProblem<Distances> problem{distances, instance, algorithm_formatter};
-    lin_kernighan_engine::run(problem, engine_parameters, std::move(candidates), initial_tour);
+    lin_kernighan_engine::run(problem, engine_parameters, std::move(candidate_lists), initial_tour);
 
     algorithm_formatter.end();
     return output;

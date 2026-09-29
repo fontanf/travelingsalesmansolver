@@ -1,4 +1,5 @@
 add_subdirectory(distances)
+add_subdirectory(candidates)
 
 add_library(TravelingSalesmanSolver_traveling_salesman)
 target_sources(TravelingSalesmanSolver_traveling_salesman PRIVATE

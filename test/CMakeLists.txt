@@ -35,3 +35,11 @@ target_link_libraries(TravelingSalesmanSolver_tour_merging_test
     TravelingSalesmanSolver_distances
     GTest::gtest_main)
 gtest_discover_tests(TravelingSalesmanSolver_tour_merging_test)
+
+add_executable(TravelingSalesmanSolver_alpha_nearness_test)
+target_sources(TravelingSalesmanSolver_alpha_nearness_test PRIVATE
+    candidates/alpha_nearness_test.cpp)
+target_link_libraries(TravelingSalesmanSolver_alpha_nearness_test
+    TravelingSalesmanSolver_candidates
+    GTest::gtest_main)
+gtest_discover_tests(TravelingSalesmanSolver_alpha_nearness_test)
