@@ -10,7 +10,7 @@ option(TRAVELINGSALESMANSOLVER_BUILD_TEST "Build the unit tests" ON)
 cmake_policy(SET CMP0135 NEW)
 
 # Require C++14.
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 # Enable output of compile commands during generation.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

@@ -79,8 +79,8 @@ Output run(
             parameters.non_sequential_moves = vm["non-sequential-moves"].as<bool>();
         if (vm.count("perturbation"))
             parameters.perturbation = vm["perturbation"].as<std::string>();
-        if (vm.count("maximum-number-of-kicks"))
-            parameters.maximum_number_of_kicks = vm["maximum-number-of-kicks"].as<int64_t>();
+        if (vm.count("maximum-number-of-trials"))
+            parameters.maximum_number_of_trials = vm["maximum-number-of-trials"].as<int64_t>();
         return lin_kernighan(instance, parameters);
 
     } else {
@@ -115,9 +115,9 @@ int main(int argc, char *argv[])
         ("max-trials,", po::value<std::string>(), "set max trials")
 
         ("number-of-candidates,", po::value<VertexId>(), "set number of candidates (lin-kernighan)")
-        ("maximum-number-of-kicks,", po::value<int64_t>(), "set maximum number of kicks (lin-kernighan)")
-        ("move-type,", po::value<int>(), "set move type: 2 (chained LK) to 5 (LKH-style 5-opt steps) (lin-kernighan)")
-        ("perturbation,", po::value<std::string>(), "set perturbation: kicks or trials (lin-kernighan)")
+        ("maximum-number-of-trials,", po::value<int64_t>(), "set maximum number of trials or kicks (lin-kernighan)")
+        ("move-type,", po::value<int>(), "set move type: 3 to 5 (lin-kernighan)")
+        ("perturbation,", po::value<std::string>(), "set perturbation: walks, double-bridge or segment-swap (lin-kernighan)")
         ("restricted-search,", po::value<bool>(), "set restricted search (lin-kernighan)")
         ("non-sequential-moves,", po::value<bool>(), "set non-sequential moves (lin-kernighan)")
         ("maximum-depth,", po::value<int>(), "set maximum number of steps in a chain (lin-kernighan)")

@@ -6,11 +6,11 @@ const Output travelingsalesmansolver::lin_kernighan(
         const Instance& instance,
         const LinKernighanParameters& parameters)
 {
-    if (parameters.move_type < 2
+    if (parameters.move_type < 3
             || parameters.move_type > SequentialMovePatterns::maximum_number_of_removed_edges) {
         throw std::invalid_argument(
                 "travelingsalesmansolver::lin_kernighan: "
-                "the move type must be between 2 and "
+                "the move type must be between 3 and "
                 + std::to_string(SequentialMovePatterns::maximum_number_of_removed_edges)
                 + "; move type: " + std::to_string(parameters.move_type) + ".");
     }

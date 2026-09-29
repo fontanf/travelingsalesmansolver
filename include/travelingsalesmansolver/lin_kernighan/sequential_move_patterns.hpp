@@ -72,6 +72,16 @@ public:
 
         /** Number of cycles (besides the path from t[0] to t[2m - 1]). */
         int number_of_cycles = 0;
+
+        /**
+         * If closable, the tour obtained by the closed move: its m segments
+         * (gaps), in the order of a traversal starting at end 0 (t[0]) along
+         * its segment, and whether each is traversed backward (against the
+         * forward direction). The traversal ends with the closing edge
+         * (t[2m - 1], t[0]).
+         */
+        std::array<int, maximum_number_of_removed_edges> new_tour_gaps;
+        std::array<bool, maximum_number_of_removed_edges> new_tour_backward;
     };
 
     /** Get the patterns (computed once). */
@@ -210,6 +220,24 @@ private:
         }
         // Closing (t[2m - 1], t[0]) joins the ends of the path.
         pattern.closable = (pattern.number_of_cycles == 0);
+        if (pattern.closable) {
+            auto added_or_closing_neighbor = [number_of_ends](int end)
+            {
+                if (end == 0)
+                    return number_of_ends - 1;
+                if (end == number_of_ends - 1)
+                    return 0;
+                return (end % 2 == 1)? end + 1: end - 1;
+            };
+            int end = 0;
+            int pos = 0;
+            do {
+                pattern.new_tour_gaps[pos] = pattern.end_gaps[end];
+                pattern.new_tour_backward[pos] = (pattern.end_sides[end] == 1);
+                pos++;
+                end = added_or_closing_neighbor(segment_neighbors[end]);
+            } while (end != 0);
+        }
         (void)m;
     }
 
