@@ -204,6 +204,21 @@ std::vector<VertexId> partition_crossover(
  * positions of its group. Vertex sets are compared by hashing (sums of
  * random values), then exactly.
  */
+struct PartialTranscriptionBuffers
+{
+    std::vector<VertexId> positions_other;
+    std::vector<uint64_t> hashes_tour;
+    std::vector<uint64_t> hashes_other;
+    std::vector<Distance> lengths_tour;
+    std::vector<Distance> lengths_other;
+    std::vector<uint8_t> used;
+    std::vector<uint8_t> marks;
+    std::vector<VertexId> offsets;
+    std::vector<VertexId> group_starts;
+    std::vector<VertexId> group_positions;
+    std::vector<std::tuple<VertexId, VertexId, VertexId, bool>> replacements;
+};
+
 template <typename Distances>
 bool partial_transcription(
         const Distances& distances,
@@ -211,43 +226,77 @@ bool partial_transcription(
         const std::vector<VertexId>& other,
         std::mt19937_64& generator,
         const std::vector<uint64_t>& vertex_hashes,
+        PartialTranscriptionBuffers& buffers,
         int maximum_number_of_pairs = 10)
 {
     VertexId n = tour.size();
-    std::vector<VertexId> positions_other(n);
+    std::vector<VertexId>& positions_other = buffers.positions_other;
+    positions_other.resize(n);
     for (VertexId pos = 0; pos < n; ++pos)
         positions_other[other[pos]] = pos;
     // Prefix sums of hashes and lengths (linear, no wrap-around).
-    std::vector<uint64_t> hashes_tour(n + 1, 0), hashes_other(n + 1, 0);
-    std::vector<Distance> lengths_tour(n, 0), lengths_other(n, 0);
+    std::vector<uint64_t>& hashes_tour = buffers.hashes_tour;
+    std::vector<uint64_t>& hashes_other = buffers.hashes_other;
+    std::vector<Distance>& lengths_tour = buffers.lengths_tour;
+    std::vector<Distance>& lengths_other = buffers.lengths_other;
+    hashes_tour.resize(n + 1);
+    hashes_other.resize(n + 1);
+    lengths_tour.resize(n);
+    lengths_other.resize(n);
+    hashes_tour[0] = 0;
+    hashes_other[0] = 0;
+    lengths_tour[0] = 0;
+    lengths_other[0] = 0;
     for (VertexId pos = 0; pos < n; ++pos) {
         hashes_tour[pos + 1] = hashes_tour[pos] + vertex_hashes[tour[pos]];
         hashes_other[pos + 1] = hashes_other[pos] + vertex_hashes[other[pos]];
-        if (pos > 0) {
-            lengths_tour[pos] = lengths_tour[pos - 1] + distances.distance(tour[pos - 1], tour[pos]);
-            lengths_other[pos] = lengths_other[pos - 1] + distances.distance(other[pos - 1], other[pos]);
-        }
+    }
+    for (VertexId pos = 1; pos < n; ++pos) {
+        Distance distance_tour = distances.distance(tour[pos - 1], tour[pos]);
+        Distance distance_other = distances.distance(other[pos - 1], other[pos]);
+        lengths_tour[pos] = lengths_tour[pos - 1] + distance_tour;
+        lengths_other[pos] = lengths_other[pos - 1] + distance_other;
     }
 
     // Replacements: (p, q, k, forward).
-    std::vector<std::tuple<VertexId, VertexId, VertexId, bool>> replacements;
-    std::vector<bool> used(n, false);
-    std::vector<bool> marks(n, false);
-    std::vector<std::vector<VertexId>> groups(n);
+    auto& replacements = buffers.replacements;
+    replacements.clear();
+    std::vector<uint8_t>& used = buffers.used;
+    std::vector<uint8_t>& marks = buffers.marks;
+    used.assign(n, 0);
+    marks.assign(n, 0);
+    std::vector<VertexId>& offsets = buffers.offsets;
+    std::vector<VertexId>& group_starts = buffers.group_starts;
+    std::vector<VertexId>& group_positions = buffers.group_positions;
+    offsets.resize(n);
+    group_positions.resize(n);
     for (bool forward: {true, false}) {
-        for (auto& group: groups)
-            group.clear();
+        // Group the positions by offset (counting sort, positions in
+        // increasing order within a group).
+        group_starts.assign(n + 1, 0);
         for (VertexId pos = 0; pos < n; ++pos) {
             VertexId offset = (forward)?
-                (positions_other[tour[pos]] - pos + n) % n:
-                (positions_other[tour[pos]] + pos) % n;
-            groups[offset].push_back(pos);
+                positions_other[tour[pos]] - pos:
+                positions_other[tour[pos]] + pos;
+            if (offset < 0)
+                offset += n;
+            if (offset >= n)
+                offset -= n;
+            offsets[pos] = offset;
+            group_starts[offset + 1]++;
         }
-        for (const auto& group: groups) {
-            for (size_t t = 0; t < group.size(); ++t) {
-                for (int r = 1; r <= maximum_number_of_pairs && t + r < group.size(); ++r) {
-                    VertexId p = group[t];
-                    VertexId q = group[t + r];
+        for (VertexId offset = 0; offset < n; ++offset)
+            group_starts[offset + 1] += group_starts[offset];
+        for (VertexId pos = 0; pos < n; ++pos)
+            group_positions[group_starts[offsets[pos]]++] = pos;
+        // (group_starts[offset] is now the end of the group 'offset'.)
+        for (VertexId offset = 0; offset < n; ++offset) {
+            VertexId group_start = (offset == 0)? 0: group_starts[offset - 1];
+            VertexId group_end = group_starts[offset];
+            for (VertexId t = group_start; t < group_end; ++t) {
+                for (int r = 1; r <= maximum_number_of_pairs && t + r < group_end; ++r) {
+                    VertexId p = group_positions[t];
+                    VertexId q = group_positions[t + r];
                     VertexId length = q - p;
                     if (length < 2)
                         continue;
@@ -275,7 +324,7 @@ bool partial_transcription(
                         continue;
                     // Exact check of the vertex sets.
                     for (VertexId pos = p; pos <= q; ++pos)
-                        marks[tour[pos]] = true;
+                        marks[tour[pos]] = 1;
                     bool same = true;
                     VertexId first = (forward)? k: l;
                     VertexId last = (forward)? l: k;
@@ -283,11 +332,11 @@ bool partial_transcription(
                         if (!marks[other[pos]])
                             same = false;
                     for (VertexId pos = p; pos <= q; ++pos)
-                        marks[tour[pos]] = false;
+                        marks[tour[pos]] = 0;
                     if (!same)
                         continue;
                     for (VertexId pos = p; pos <= q; ++pos)
-                        used[pos] = true;
+                        used[pos] = 1;
                     replacements.emplace_back(p, q, k, forward);
                 }
             }
@@ -303,6 +352,19 @@ bool partial_transcription(
             tour[pos] = (forward)? other[k + (pos - p)]: other[k - (pos - p)];
     }
     return !replacements.empty();
+}
+
+template <typename Distances>
+bool partial_transcription(
+        const Distances& distances,
+        std::vector<VertexId>& tour,
+        const std::vector<VertexId>& other,
+        std::mt19937_64& generator,
+        const std::vector<uint64_t>& vertex_hashes,
+        int maximum_number_of_pairs = 10)
+{
+    PartialTranscriptionBuffers buffers;
+    return partial_transcription(distances, tour, other, generator, vertex_hashes, buffers, maximum_number_of_pairs);
 }
 
 /**
@@ -330,14 +392,15 @@ std::vector<VertexId> iterative_partial_transcription(
     std::vector<VertexId> tour_a = tour_1;
     std::vector<VertexId> tour_b = tour_2;
     std::uniform_int_distribution<VertexId> distribution(0, n - 1);
+    PartialTranscriptionBuffers buffers;
     int number_of_rounds_without_improvement = 0;
     for (int round = 0;
             round < maximum_number_of_rounds && number_of_rounds_without_improvement < 2;
             ++round) {
         std::rotate(tour_a.begin(), tour_a.begin() + distribution(generator), tour_a.end());
         std::rotate(tour_b.begin(), tour_b.begin() + distribution(generator), tour_b.end());
-        bool improved_a = partial_transcription(distances, tour_a, tour_b, generator, vertex_hashes);
-        bool improved_b = partial_transcription(distances, tour_b, tour_a, generator, vertex_hashes);
+        bool improved_a = partial_transcription(distances, tour_a, tour_b, generator, vertex_hashes, buffers);
+        bool improved_b = partial_transcription(distances, tour_b, tour_a, generator, vertex_hashes, buffers);
         if (improved_a || improved_b) {
             number_of_rounds_without_improvement = 0;
         } else {
