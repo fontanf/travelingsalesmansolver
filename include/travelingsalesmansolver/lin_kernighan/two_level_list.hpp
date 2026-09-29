@@ -4,12 +4,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 namespace travelingsalesmansolver
 {
+
 
 /**
  * Tour represented as a two-level doubly-linked list (Fredman, Johnson &
@@ -37,8 +39,13 @@ namespace travelingsalesmansolver
  *
  * Reversing a path or its complement gives the same cycle, but in opposite
  * directions: after a 'reverse' or a 'two_opt_move', the direction in which
- * the tour is traversed ('next' versus 'previous') is not preserved. Callers
- * must not assume it is.
+ * the tour is traversed ('next' versus 'previous') is not preserved. They
+ * return 'true' when the complement was reversed, so that callers can track
+ * the direction.
+ *
+ * Weights of the edges ('set_weight'): the list maintains the cumulative
+ * weight along the tour ('cumulative_weight', 'path_weight'), recomputed
+ * lazily for the segments modified since the last query.
  */
 class TwoLevelList
 {
@@ -57,6 +64,15 @@ public:
             VertexId segment_size = -1)
     {
         build(tour, segment_size);
+    }
+
+    /** Set the weight of the edges (a symmetric function). */
+    void set_weight(std::function<Distance(VertexId, VertexId)> weight)
+    {
+        weight_ = std::move(weight);
+        vertex_prefixes_.assign(vertices_.size(), 0);
+        segment_weights_.assign(segments_.size(), SegmentWeights());
+        weights_valid_ = false;
     }
 
     /** Get the number of vertices. */
@@ -115,39 +131,41 @@ public:
      * (a, vertex_id_2) and (vertex_id_1, d).
      *
      * Reversing the whole tour does nothing (it gives the same cycle).
+     *
+     * Return 'true' iff the complement of the path was reversed instead.
      */
-    void reverse(
+    bool reverse(
             VertexId vertex_id_1,
             VertexId vertex_id_2)
     {
         if (vertex_id_1 == vertex_id_2)
-            return;
+            return false;
         VertexId before_id = previous(vertex_id_1);
         VertexId after_id = next(vertex_id_2);
         if (after_id == vertex_id_1)
-            return;
+            return false;
 
         // The path, or its complement, lies inside a single segment.
         if (within_segment(vertex_id_1, vertex_id_2)) {
             reverse_within_segment(vertex_id_1, vertex_id_2);
-            return;
+            return false;
         }
         if (within_segment(after_id, before_id)) {
             reverse_within_segment(after_id, before_id);
-            return;
+            return true;
         }
 
         // Split the segments so that the path consists of whole segments.
         split_before(vertex_id_1, -1);
         if (within_segment(vertex_id_1, vertex_id_2)) {
             reverse_within_segment(vertex_id_1, vertex_id_2);
-            return;
+            return false;
         }
         // 'vertex_id_1' must stay the first vertex of its segment.
         split_before(after_id, vertices_[vertex_id_1].segment_id);
         if (within_segment(vertex_id_1, vertex_id_2)) {
             reverse_within_segment(vertex_id_1, vertex_id_2);
-            return;
+            return false;
         }
 
         // Reverse the shorter of the path and its complement.
@@ -156,11 +174,12 @@ public:
         SegmentId number_of_segments_path = run_size(segment_id_1, segment_id_2);
         if (2 * number_of_segments_path <= number_of_segments()) {
             reverse_segments(segment_id_1, segment_id_2);
-        } else {
-            reverse_segments(
-                    vertices_[after_id].segment_id,
-                    vertices_[before_id].segment_id);
+            return false;
         }
+        reverse_segments(
+                vertices_[after_id].segment_id,
+                vertices_[before_id].segment_id);
+        return true;
     }
 
     /**
@@ -170,8 +189,10 @@ public:
      * For the result to be a tour, 't2' and 't4' must be on opposite sides:
      * either t2 = next(t1) and t4 = previous(t3), or t2 = previous(t1) and
      * t4 = next(t3).
+     *
+     * Return 'true' iff the direction of the tour changed (see 'reverse').
      */
-    void two_opt_move(
+    bool two_opt_move(
             VertexId t1,
             VertexId t2,
             VertexId t3,
@@ -179,11 +200,50 @@ public:
     {
         if (next(t1) == t2) {
             // t1 t2 ... t4 t3 -> t1 t4 ... t2 t3
-            reverse(t2, t4);
+            return reverse(t2, t4);
         } else {
             // t2 t1 ... t3 t4 -> t2 t3 ... t1 t4
-            reverse(t1, t3);
+            return reverse(t1, t3);
         }
+    }
+
+    /**
+     * Get the weight of the path from the first vertex of the first segment
+     * of the list to 'vertex_id', following 'next'.
+     */
+    inline Distance cumulative_weight(VertexId vertex_id) const
+    {
+        update_weights();
+        const Vertex& vertex = vertices_[vertex_id];
+        const SegmentWeights& segment_weights = segment_weights_[vertex.segment_id];
+        return segment_weights.offset + ((segments_[vertex.segment_id].reversed)?
+                segment_weights.stored_total - vertex_prefixes_[vertex_id]:
+                vertex_prefixes_[vertex_id]);
+    }
+
+    /** Get the weight of the path from 'vertex_id_1' to 'vertex_id_2' following 'next'. */
+    inline Distance path_weight(
+            VertexId vertex_id_1,
+            VertexId vertex_id_2) const
+    {
+        Distance weight_1 = cumulative_weight(vertex_id_1);
+        Distance weight_2 = cumulative_weight(vertex_id_2);
+        if (position(vertex_id_1) <= position(vertex_id_2))
+            return weight_2 - weight_1;
+        return total_weight_ - weight_1 + weight_2;
+    }
+
+    /** Get the total weight of the tour. */
+    inline Distance total_weight() const
+    {
+        update_weights();
+        return total_weight_;
+    }
+
+    /** Get an upper bound of the positions ('position'). */
+    inline int64_t positions_size() const
+    {
+        return number_of_segments() * (number_of_vertices() + 1);
     }
 
     /**
@@ -275,9 +335,77 @@ private:
         bool reversed = false;
     };
 
+    /** Weights of a segment (kept apart from 'Segment', not to slow down the other operations). */
+    struct SegmentWeights
+    {
+        /** Weight of the segment's edges. */
+        Distance stored_total = 0;
+
+        /** Weight from the first vertex of the list to the segment's first vertex (tour order). */
+        Distance offset = 0;
+
+        /** Are the prefixes of the segment's vertices up to date? */
+        bool prefixes_valid = false;
+    };
+
     /*
      * Private methods
      */
+
+    /** Invalidate all the weights. */
+    void invalidate_all()
+    {
+        for (SegmentWeights& segment_weights: segment_weights_)
+            segment_weights.prefixes_valid = false;
+        weights_valid_ = false;
+    }
+
+    /** Invalidate the weights of a segment. */
+    inline void invalidate(SegmentId segment_id)
+    {
+        if (!segment_weights_.empty())
+            segment_weights_[segment_id].prefixes_valid = false;
+        weights_valid_ = false;
+    }
+
+    /** Recompute the weights of the modified segments, and the offsets. */
+    void update_weights() const
+    {
+        if (weights_valid_ || !weight_)
+            return;
+        auto& self = const_cast<TwoLevelList&>(*this);
+        for (SegmentId segment_id = 0; segment_id < number_of_segments(); ++segment_id) {
+            SegmentWeights& segment_weights = self.segment_weights_[segment_id];
+            if (segment_weights.prefixes_valid)
+                continue;
+            Distance weight = 0;
+            for (VertexId vertex_id = segments_[segment_id].stored_first;;) {
+                const Vertex& vertex = vertices_[vertex_id];
+                self.vertex_prefixes_[vertex_id] = weight;
+                if (vertex.stored_next == -1)
+                    break;
+                weight += weight_(vertex_id, vertex.stored_next);
+                vertex_id = vertex.stored_next;
+            }
+            segment_weights.stored_total = weight;
+            segment_weights.prefixes_valid = true;
+        }
+        // Offsets, from the segment of rank 0.
+        SegmentId first_segment_id = 0;
+        while (segments_[first_segment_id].rank != 0)
+            ++first_segment_id;
+        Distance offset = 0;
+        SegmentId segment_id = first_segment_id;
+        do {
+            SegmentWeights& segment_weights = self.segment_weights_[segment_id];
+            segment_weights.offset = offset;
+            offset += segment_weights.stored_total
+                + weight_(segment_last(segment_id), segment_first(segments_[segment_id].next));
+            segment_id = segments_[segment_id].next;
+        } while (segment_id != first_segment_id);
+        self.total_weight_ = offset;
+        self.weights_valid_ = true;
+    }
 
     /** Build the list from a tour. */
     void build(
@@ -322,6 +450,11 @@ private:
                 vertex.stored_next = (pos == pos_last)? -1: tour[pos + 1];
             }
         }
+        if (weight_) {
+            vertex_prefixes_.assign(number_of_vertices, 0);
+            segment_weights_.assign(number_of_segments, SegmentWeights());
+        }
+        weights_valid_ = false;
     }
 
     /** Get the first vertex of a segment, in tour order. */
@@ -446,6 +579,9 @@ private:
         if (segment_first(segment_id) == vertex_id)
             return;
         Segment& segment = segments_[segment_id];
+        invalidate(segment_id);
+        invalidate(segment.previous);
+        invalidate(segment.next);
         VertexId number_of_vertices_before = offset(vertex_id);
         VertexId number_of_vertices_after = segment.size - number_of_vertices_before;
         buffer_.clear();
@@ -502,6 +638,7 @@ private:
     {
         SegmentId segment_id = vertices_[vertex_id_1].segment_id;
         Segment& segment = segments_[segment_id];
+        invalidate(segment_id);
         // Ends of the path in stored order.
         VertexId stored_first_id = (segment.reversed)? vertex_id_2: vertex_id_1;
         VertexId stored_last_id = (segment.reversed)? vertex_id_1: vertex_id_2;
@@ -545,6 +682,7 @@ private:
     {
         SegmentId previous_segment_id = segments_[segment_id_1].previous;
         SegmentId next_segment_id = segments_[segment_id_2].next;
+        weights_valid_ = false;
         segment_buffer_.clear();
         rank_buffer_.clear();
         for (SegmentId segment_id = segment_id_1;; segment_id = segments_[segment_id].next) {
@@ -584,6 +722,21 @@ private:
     /** Buffers of segments and ranks, used by 'reverse_segments'. */
     std::vector<SegmentId> segment_buffer_;
     std::vector<int64_t> rank_buffer_;
+
+    /** Weight of the edges. */
+    std::function<Distance(VertexId, VertexId)> weight_;
+
+    /** Weight from the first vertex of its segment, in stored order, of each vertex (if weighted). */
+    std::vector<Distance> vertex_prefixes_;
+
+    /** Weights of the segments (if weighted). */
+    std::vector<SegmentWeights> segment_weights_;
+
+    /** Are the offsets (and all the prefixes) up to date? */
+    bool weights_valid_ = false;
+
+    /** Total weight of the tour. */
+    Distance total_weight_ = 0;
 
 };
 

@@ -231,6 +231,38 @@ public:
     inline void clear_added_partners() { use_partners_ = false; }
 
     /**
+     * Get the tour obtained by the last analyzed move (which must be valid):
+     * its k segments in order, starting with segment 0 traversed along
+     * 'next'; segment i is traversed from 'from[i]' to 'to[i]', along 'next'
+     * iff 'along_next[i]'.
+     */
+    void new_tour(
+            std::array<VertexId, maximum_k>& from,
+            std::array<VertexId, maximum_k>& to,
+            std::array<bool, maximum_k>& along_next) const
+    {
+        int k = k_;
+        from[0] = ends_[segments_[0].first].vertex_id;
+        to[0] = ends_[segments_[0].second].vertex_id;
+        along_next[0] = true;
+        int end = segments_[0].first;
+        for (int pos = 1; pos < k; ++pos) {
+            int other_end = (ends_[end].is_first)?
+                segments_[ends_[end].segment_id].second:
+                segments_[ends_[end].segment_id].first;
+            int next_end = added_partner(other_end);
+            int segment_id = ends_[next_end].segment_id;
+            bool forward = ends_[next_end].is_first;
+            VertexId first_vertex_id = ends_[segments_[segment_id].first].vertex_id;
+            VertexId last_vertex_id = ends_[segments_[segment_id].second].vertex_id;
+            from[pos] = (forward)? first_vertex_id: last_vertex_id;
+            to[pos] = (forward)? last_vertex_id: first_vertex_id;
+            along_next[pos] = forward;
+            end = next_end;
+        }
+    }
+
+    /**
      * Apply the last analyzed move (which must be valid) to 'tour', as a
      * sequence of path reversals. 'reverse(u, v)' must reverse the path from
      * 'u' to 'v' following 'next' (it may reverse its complement instead).
