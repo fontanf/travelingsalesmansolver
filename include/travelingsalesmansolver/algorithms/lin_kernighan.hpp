@@ -6,6 +6,7 @@
 #include "travelingsalesmansolver/lin_kernighan/candidates.hpp"
 #include "travelingsalesmansolver/lin_kernighan/greedy.hpp"
 #include "travelingsalesmansolver/lin_kernighan/k_opt_move.hpp"
+#include "travelingsalesmansolver/lin_kernighan/sequential_move_patterns.hpp"
 #include "travelingsalesmansolver/lin_kernighan/tour_merging.hpp"
 
 #include <algorithm>
@@ -60,6 +61,14 @@ struct LinKernighanParameters: Parameters
     bool restricted_search = true;
 
     /**
+     * Non-sequential moves (as LKH's 'GAIN23'): at each new local optimum,
+     * search for an improving move made of a sequential 2- or 3-opt move of
+     * positive gain splitting the tour into two cycles, followed by a 2-opt
+     * move joining them.
+     */
+    bool non_sequential_moves = true;
+
+    /**
      * Trials: the starting tour's walk follows the best tour's edges where
      * they are spanning forest edges (otherwise, as LKH with nearest
      * neighbor candidates: a random walk on candidate edges, which include
@@ -90,6 +99,7 @@ struct LinKernighanParameters: Parameters
                 {"Breadth", breadth},
                 {"Perturbation", perturbation},
                 {"RestrictedSearch", restricted_search},
+                {"NonSequentialMoves", non_sequential_moves},
                 {"MaximumNumberOfKicks", maximum_number_of_kicks},
                 {"KickSegmentLength", kick_segment_length},
                 {"Seed", seed},
@@ -108,6 +118,8 @@ struct LinKernighanParameters: Parameters
             << std::setw(width) << std::left << "Move type: " << move_type << std::endl
             << std::setw(width) << std::left << "Maximum depth: " << maximum_depth << std::endl
             << std::setw(width) << std::left << "Perturbation: " << perturbation << std::endl
+            << std::setw(width) << std::left << "Restricted search: " << restricted_search << std::endl
+            << std::setw(width) << std::left << "Non-sequential moves: " << non_sequential_moves << std::endl
             << std::setw(width) << std::left << "Maximum number of kicks: " << maximum_number_of_kicks << std::endl
             << std::setw(width) << std::left << "Kick segment length: " << kick_segment_length << std::endl
             << std::setw(width) << std::left << "Seed: " << seed << std::endl
@@ -166,6 +178,13 @@ struct LinKernighanData
 
     /** Lengths of the candidate edges (parallel to 'candidates'). */
     std::vector<std::vector<Distance>> candidate_distances;
+
+    /**
+     * For each vertex, its three shortest candidate edges, shortest first, as
+     * (length, other end) ((-, -1) if there are fewer): at most two of them
+     * are tour edges.
+     */
+    std::vector<std::array<std::pair<Distance, VertexId>, 3>> cheapest_candidates;
 
     /** Current tour. */
     TwoLevelList tour;
@@ -234,6 +253,27 @@ struct LinKernighanData
     /** For each vertex, the number of times it appears in the move being built. */
     std::vector<uint8_t> in_move;
 
+    /** Patterns of sequential moves, to enumerate them ('k_opt_search'). */
+    const SequentialMovePatterns& patterns = SequentialMovePatterns::get();
+
+    /** Whether the move being built goes along 'next' (t[1] = next(t[0])). */
+    bool forward_is_next = true;
+
+    /** Position of t[0] along the tour. */
+    int64_t key_origin = 0;
+
+    /** Upper bound of the positions along the tour. */
+    int64_t key_size = 0;
+
+    /**
+     * Keys of the ends of the move being built: their positions along the
+     * direction of the move, from t[0] (see 'key').
+     */
+    std::array<int64_t, 2 * SequentialMove::maximum_k> end_keys;
+
+    /** Vertex from which the next non-sequential search starts. */
+    VertexId non_sequential_start = 0;
+
     /** Edges added by the steps already applied in the chain (keys, see 'edge_key'). */
     std::vector<uint64_t> chain_added_edges;
 
@@ -258,6 +298,24 @@ inline bool is_restricted(
     return std::find(neighbors.begin(), neighbors.end(), t2) != neighbors.end();
 }
 
+/** Update 'cheapest_candidates' with a new candidate edge. */
+template <typename Distances>
+inline void add_cheapest_candidate(
+        LinKernighanData<Distances>& data,
+        VertexId from,
+        VertexId to,
+        Distance distance)
+{
+    std::array<std::pair<Distance, VertexId>, 3>& cheapest = data.cheapest_candidates[from];
+    std::pair<Distance, VertexId> entry = {distance, to};
+    for (int pos = 0; pos < 3; ++pos) {
+        if (cheapest[pos].second == -1 || entry.first < cheapest[pos].first)
+            std::swap(entry, cheapest[pos]);
+        if (entry.second == -1)
+            break;
+    }
+}
+
 /** Add an edge to the candidate lists of its ends, in distance order, if missing. */
 template <typename Distances>
 void add_candidate_edge(
@@ -278,6 +336,7 @@ void add_candidate_edge(
             ++pos;
         candidates.insert(candidates.begin() + pos, to);
         candidate_distances.insert(candidate_distances.begin() + pos, distance);
+        add_cheapest_candidate(data, from, to, distance);
     }
 }
 
@@ -556,45 +615,67 @@ inline Distance cheapest_candidate_distance(
         const LinKernighanData<Distances>& data,
         VertexId vertex_id)
 {
-    const std::vector<VertexId>& candidates = data.candidates[vertex_id];
-    const std::vector<Distance>& candidate_distances = data.candidate_distances[vertex_id];
     VertexId next_vertex_id = data.tour.next(vertex_id);
     VertexId previous_vertex_id = data.tour.previous(vertex_id);
-    Distance cheapest_distance = std::numeric_limits<Distance>::max();
-    for (size_t pos = 0; pos < candidates.size(); ++pos) {
-        if (candidates[pos] == next_vertex_id || candidates[pos] == previous_vertex_id)
-            continue;
-        cheapest_distance = (std::min)(cheapest_distance, candidate_distances[pos]);
+    for (const auto& entry: data.cheapest_candidates[vertex_id]) {
+        if (entry.second == -1)
+            return 0;
+        if (entry.second != next_vertex_id && entry.second != previous_vertex_id)
+            return entry.first;
     }
-    return (cheapest_distance == std::numeric_limits<Distance>::max())? 0: cheapest_distance;
+    return 0;
+}
+
+/**
+ * Key of a vertex: its position along the direction of the move being built,
+ * from t[0].
+ */
+template <typename Distances>
+inline int64_t key(
+        const LinKernighanData<Distances>& data,
+        VertexId vertex_id)
+{
+    int64_t position = data.tour.position(vertex_id) - data.key_origin;
+    if (!data.forward_is_next)
+        position = -position;
+    if (position < 0)
+        position += data.key_size;
+    return position;
 }
 
 /**
  * Search for a sequential move of up to k = 'move_type' edges, extending
  * the move t[0], ..., t[2 * level - 1] (whose removed minus added edges
- * total 'gain').
+ * total 'gain', and whose pattern is 'pattern_id'; see
+ * 'SequentialMovePatterns').
  *
  * Every combination of candidates is tried, level by level, as long as the
- * gain stays positive. A move improving the tour is applied at once (the
- * function then returns 'true'). Otherwise, the valid k-opt move with the
+ * partial gain is positive (the gain criterion), skipping the moves which
+ * can't be closed validly anymore. The first valid move with a positive gain
+ * is applied (return 'true'). Otherwise, the valid k-opt move with the
  * largest gain before its closing edge is recorded ('best_t'), to continue
  * the chain from, provided that the next step can still find a positive
  * gain and that its last removed edge wasn't added by the chain (as in
  * LKH; the other edges aren't restricted).
+ *
+ * The pattern of the move gives its validity, and the pattern of each
+ * extension, from the gap of the new vertex among the ends of the move (as
+ * LKH's case analysis): moves are only analyzed when applied.
  */
 template <typename Distances>
 bool k_opt_search(
         LinKernighanData<Distances>& data,
         int level,
-        Distance gain)
+        Distance gain,
+        int pattern_id)
 {
     int k = data.parameters.move_type;
+    bool last_level = (level + 1 == k);
+    int number_of_ends = 2 * level;
+    const SequentialMovePatterns::Pattern& pattern = data.patterns.pattern(pattern_id);
     VertexId t_last = data.t[2 * level - 1];
     const std::vector<VertexId>& candidates = data.candidates[t_last];
     const std::vector<Distance>& candidate_distances = data.candidate_distances[t_last];
-    bool last_level = (level + 1 == k);
-    if (last_level)
-        data.sequential_move.start_last_level();
     for (size_t candidate_pos = 0; candidate_pos < candidates.size(); ++candidate_pos) {
         VertexId t_new = candidates[candidate_pos];
         // Added edge (t_last, t_new).
@@ -605,52 +686,71 @@ bool k_opt_search(
             continue;
         if (t_new == data.tour.next(t_last) || t_new == data.tour.previous(t_last))
             continue;
-        for (int side = 0; side < 2; ++side) {
+        if (t_new == data.t[0])
+            continue;
+        // Gap of t_new among the ends of the move, and the possible sides of
+        // t_next.
+        int gap = 0;
+        int sides = 0;
+        int64_t key_new = 0;
+        if (data.in_move[t_new] == 0) {
+            key_new = key(data, t_new);
+            int number_of_ends_before = 0;
+            for (int end = 0; end < number_of_ends; ++end)
+                number_of_ends_before += (data.end_keys[end] < key_new);
+            gap = number_of_ends_before - 1;
+            sides = 3;
+        } else if (data.in_move[t_new] == 1) {
+            // An end of a removed edge: its other tour edge can be removed.
+            int end = 0;
+            while (data.t[end] != t_new)
+                ++end;
+            gap = pattern.end_gaps[end];
+            sides = 1 << pattern.end_sides[end];
+            key_new = data.end_keys[end];
+        } else {
+            continue;
+        }
+        for (int side_pos = 0; side_pos < 2; ++side_pos) {
+            // Side 0: t_next follows t_new along the direction of the move.
+            // (t_next = next(t_new) is tried first.)
+            int side = (data.forward_is_next)? side_pos: 1 - side_pos;
+            if (!(sides & (1 << side)))
+                continue;
+            int next_pattern_id = pattern.next[gap][side];
+            const SequentialMovePatterns::Pattern& next_pattern = data.patterns.pattern(next_pattern_id);
             // Removed edge (t_new, t_next).
-            VertexId t_next = (side == 0)?
+            VertexId t_next = (side_pos == 0)?
                 data.tour.next(t_new):
                 data.tour.previous(t_new);
             if (t_next == data.t[0])
                 continue;
-            // The edge can only be already removed by the move if both its
-            // ends are in the move.
-            if (data.in_move[t_new] && data.in_move[t_next]) {
-                bool already_removed = false;
-                for (int j = 0; j < level; ++j) {
-                    if ((data.t[2 * j] == t_new && data.t[2 * j + 1] == t_next)
-                            || (data.t[2 * j] == t_next && data.t[2 * j + 1] == t_new)) {
-                        already_removed = true;
-                        break;
-                    }
-                }
-                if (already_removed)
-                    continue;
-            }
             data.t[2 * level] = t_new;
             data.t[2 * level + 1] = t_next;
-            data.sequential_move.invalidate(level);
-            bool new_ends = !data.in_move[t_new] && !data.in_move[t_next];
-            auto is_valid = [&data, level, last_level, new_ends]()
-            {
-                return (last_level && new_ends)?
-                    data.sequential_move.is_valid_last(data.tour, data.t.data(), level + 1):
-                    data.sequential_move.is_valid(data.tour, data.t.data(), level + 1);
-            };
+            assert(data.sequential_move.analyze(data.tour, data.t.data(), level + 1)
+                    == next_pattern.closable);
+            assert(data.sequential_move.count_cycles(data.tour, data.t.data(), level + 1) - 1
+                    == next_pattern.number_of_cycles);
+            // Skip the moves which can't be closed validly anymore.
+            if (last_level) {
+                if (!next_pattern.closable)
+                    continue;
+            } else if (next_pattern.number_of_cycles > k - level - 1) {
+                continue;
+            }
             Distance gain_2 = gain_1 + data.distances.distance(t_new, t_next);
-            Distance closed_gain = gain_2 - data.distances.distance(t_next, data.t[0]);
-            if (closed_gain > 0 && is_valid()) {
-                // 'is_valid_last' may not have analyzed the move itself.
-                if (last_level && new_ends) {
-                    data.sequential_move.invalidate(level);
-                    data.sequential_move.is_valid(data.tour, data.t.data(), level + 1);
-                }
+            if (next_pattern.closable
+                    && gain_2 - data.distances.distance(t_next, data.t[0]) > 0) {
+                data.sequential_move.analyze(data.tour, data.t.data(), level + 1);
                 apply_sequential_move(data);
                 return true;
             }
-            if (level + 1 < k) {
+            if (!last_level) {
+                data.end_keys[2 * level] = key_new;
+                data.end_keys[2 * level + 1] = key(data, t_next);
                 data.in_move[t_new]++;
                 data.in_move[t_next]++;
-                bool found = k_opt_search(data, level + 1, gain_2);
+                bool found = k_opt_search(data, level + 1, gain_2, next_pattern_id);
                 data.in_move[t_new]--;
                 data.in_move[t_next]--;
                 if (found)
@@ -665,8 +765,7 @@ bool k_opt_search(
                     && std::find(
                         data.chain_added_edges.begin(),
                         data.chain_added_edges.end(),
-                        edge_key(data, t_new, t_next)) == data.chain_added_edges.end()
-                    && is_valid()) {
+                        edge_key(data, t_new, t_next)) == data.chain_added_edges.end()) {
                 data.has_best = true;
                 data.best_gain = gain_2;
                 data.best_t = data.t;
@@ -701,11 +800,15 @@ bool lin_kernighan_improve_k_opt(
         for (int step = 0; step < data.parameters.maximum_depth; ++step) {
             data.t[0] = t1;
             data.t[1] = t2_current;
-            data.sequential_move.start(data.tour, data.t.data());
             data.has_best = false;
+            data.forward_is_next = (data.tour.next(t1) == t2_current);
+            data.key_origin = data.tour.position(t1);
+            data.key_size = data.tour.number_of_segments() * (data.tour.number_of_vertices() + 1);
+            data.end_keys[0] = 0;
+            data.end_keys[1] = key(data, t2_current);
             data.in_move[t1]++;
             data.in_move[t2_current]++;
-            bool found = k_opt_search(data, 1, gain);
+            bool found = k_opt_search(data, 1, gain, SequentialMovePatterns::first_pattern_id);
             data.in_move[t1]--;
             data.in_move[t2_current]--;
             if (found) {
@@ -736,37 +839,270 @@ bool lin_kernighan_improve_k_opt(
     return false;
 }
 
+/** Is (u, v) one of the first k removed edges of the move 't'? */
+inline bool is_removed(
+        const VertexId* t,
+        int k,
+        VertexId u,
+        VertexId v)
+{
+    for (int i = 0; i < k; ++i)
+        if ((t[2 * i] == u && t[2 * i + 1] == v) || (t[2 * i] == v && t[2 * i + 1] == u))
+            return true;
+    return false;
+}
+
+/**
+ * Apply the move last analyzed by 'data.sequential_move', of gain 'gain',
+ * and activate its ends.
+ */
+template <typename Distances>
+void apply_improving_move(
+        LinKernighanData<Distances>& data,
+        const VertexId* t,
+        int k,
+        Distance gain)
+{
+    Distance length = data.length;
+    apply_sequential_move(data);
+    (void)length;
+    (void)gain;
+    assert(data.length == length - gain);
+    for (int pos = 0; pos < 2 * k; ++pos)
+        activate(data, t[pos]);
+}
+
+/**
+ * Try to join the two cycles made by the sequential move t[0], ...,
+ * t[2k - 1] (of gain 'gain', whose cycles have been computed by
+ * 'count_cycles') into a shorter tour, with a 2-opt move: remove a tour edge
+ * (s1, s2) of the smaller cycle, add a candidate edge (s2, s3) to the other
+ * cycle, remove a tour edge (s3, s4) there, and add (s4, s1). Apply the
+ * first improving one found.
+ */
+template <typename Distances>
+bool join_cycles(
+        LinKernighanData<Distances>& data,
+        std::array<VertexId, 2 * SequentialMove::maximum_k>& t,
+        int k,
+        Distance gain)
+{
+    SequentialMove& move = data.sequential_move;
+    const TwoLevelList& tour = data.tour;
+    std::array<std::array<int, SequentialMove::maximum_k>, 2> cycle_segments;
+    std::array<int, 2> number_of_cycle_segments = {0, 0};
+    for (int segment_id = 0; segment_id < k; ++segment_id) {
+        int cycle_id = move.segment_cycle(segment_id);
+        cycle_segments[cycle_id][number_of_cycle_segments[cycle_id]++] = segment_id;
+    }
+
+    // Find the smaller cycle, by walking both at the same pace.
+    std::array<int, 2> positions = {0, 0};
+    std::array<VertexId, 2> vertex_ids = {
+        move.segment_first_vertex(cycle_segments[0][0]),
+        move.segment_first_vertex(cycle_segments[1][0])};
+    int smaller_cycle_id = -1;
+    while (smaller_cycle_id == -1) {
+        for (int cycle_id = 0; cycle_id < 2; ++cycle_id) {
+            int segment_id = cycle_segments[cycle_id][positions[cycle_id]];
+            if (vertex_ids[cycle_id] != move.segment_last_vertex(segment_id)) {
+                vertex_ids[cycle_id] = tour.next(vertex_ids[cycle_id]);
+                continue;
+            }
+            positions[cycle_id]++;
+            if (positions[cycle_id] == number_of_cycle_segments[cycle_id]) {
+                smaller_cycle_id = cycle_id;
+                break;
+            }
+            vertex_ids[cycle_id] = move.segment_first_vertex(
+                    cycle_segments[cycle_id][positions[cycle_id]]);
+        }
+    }
+
+    // Added edges of the whole move: those of the sequential move, then
+    // (s2, s3) and (s4, s1).
+    std::array<int, 2 * SequentialMove::maximum_k> partners;
+    for (int end = 0; end < 2 * k; ++end)
+        partners[end] = (end % 2 == 1)? (end + 1) % (2 * k): (end + 2 * k - 1) % (2 * k);
+    partners[2 * k] = 2 * k + 3;
+    partners[2 * k + 3] = 2 * k;
+    partners[2 * k + 1] = 2 * k + 2;
+    partners[2 * k + 2] = 2 * k + 1;
+
+    for (int pos = 0; pos < number_of_cycle_segments[smaller_cycle_id]; ++pos) {
+        int segment_id = cycle_segments[smaller_cycle_id][pos];
+        VertexId last_vertex_id = move.segment_last_vertex(segment_id);
+        for (VertexId vertex_id = move.segment_first_vertex(segment_id);
+                vertex_id != last_vertex_id;
+                vertex_id = tour.next(vertex_id)) {
+            VertexId next_vertex_id = tour.next(vertex_id);
+            for (int side = 0; side < 2; ++side) {
+                VertexId s1 = (side == 0)? vertex_id: next_vertex_id;
+                VertexId s2 = (side == 0)? next_vertex_id: vertex_id;
+                Distance gain_1 = gain + data.distances.distance(s1, s2);
+                const std::vector<VertexId>& candidates = data.candidates[s2];
+                const std::vector<Distance>& candidate_distances = data.candidate_distances[s2];
+                for (size_t candidate_pos = 0; candidate_pos < candidates.size(); ++candidate_pos) {
+                    VertexId s3 = candidates[candidate_pos];
+                    Distance gain_2 = gain_1 - candidate_distances[candidate_pos];
+                    if (gain_2 <= 0)
+                        continue;
+                    if (is_removed(t.data(), k, s2, s3))
+                        continue;
+                    if (move.segment_cycle(move.segment(tour, s3)) == smaller_cycle_id)
+                        continue;
+                    for (VertexId s4: {tour.next(s3), tour.previous(s3)}) {
+                        if (is_removed(t.data(), k, s3, s4))
+                            continue;
+                        Distance total_gain = gain_2
+                            + data.distances.distance(s3, s4)
+                            - data.distances.distance(s4, s1);
+                        if (total_gain <= 0)
+                            continue;
+                        t[2 * k] = s1;
+                        t[2 * k + 1] = s2;
+                        t[2 * k + 2] = s3;
+                        t[2 * k + 3] = s4;
+                        move.set_added_partners(partners.data(), k + 2);
+                        bool valid = move.analyze(tour, t.data(), k + 2);
+                        if (valid)
+                            apply_improving_move(data, t.data(), k + 2, total_gain);
+                        move.clear_added_partners();
+                        if (valid)
+                            return true;
+                        // Restore the sequential move's analysis.
+                        move.start(tour, t.data());
+                        move.count_cycles(tour, t.data(), k);
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Search for an improving non-sequential move (as LKH's 'GAIN23'): a
+ * sequential 2- or 3-opt move of positive gain which splits the tour into
+ * two cycles, followed by a 2-opt move joining them ('join_cycles'). Apply
+ * the first one found.
+ */
+template <typename Distances>
+bool non_sequential_search(
+        LinKernighanData<Distances>& data)
+{
+    SequentialMove& move = data.sequential_move;
+    const TwoLevelList& tour = data.tour;
+    std::array<VertexId, 2 * SequentialMove::maximum_k> t;
+    // Resume from where the previous search stopped.
+    VertexId number_of_vertices = tour.number_of_vertices();
+    for (VertexId count = 0; count < number_of_vertices; ++count) {
+        VertexId t1 = data.non_sequential_start;
+        data.non_sequential_start = (t1 + 1) % number_of_vertices;
+        for (VertexId t2: {tour.next(t1), tour.previous(t1)}) {
+            Distance gain_0 = data.distances.distance(t1, t2);
+            const std::vector<VertexId>& candidates_2 = data.candidates[t2];
+            for (size_t candidate_pos_2 = 0; candidate_pos_2 < candidates_2.size(); ++candidate_pos_2) {
+                VertexId t3 = candidates_2[candidate_pos_2];
+                Distance gain_1 = gain_0 - data.candidate_distances[t2][candidate_pos_2];
+                if (gain_1 <= 0)
+                    continue;
+                if (t3 == tour.next(t2) || t3 == tour.previous(t2))
+                    continue;
+                for (VertexId t4: {tour.next(t3), tour.previous(t3)}) {
+                    if (t4 == t1)
+                        continue;
+                    Distance gain_2 = gain_1 + data.distances.distance(t3, t4);
+                    t[0] = t1;
+                    t[1] = t2;
+                    t[2] = t3;
+                    t[3] = t4;
+                    Distance gain = gain_2 - data.distances.distance(t4, t1);
+                    if (gain > 0) {
+                        move.start(tour, t.data());
+                        int number_of_cycles = move.count_cycles(tour, t.data(), 2);
+                        if (number_of_cycles == 1) {
+                            apply_improving_move(data, t.data(), 2, gain);
+                            return true;
+                        }
+                        if (number_of_cycles == 2 && join_cycles(data, t, 2, gain))
+                            return true;
+                    }
+                    const std::vector<VertexId>& candidates_4 = data.candidates[t4];
+                    for (size_t candidate_pos_4 = 0; candidate_pos_4 < candidates_4.size(); ++candidate_pos_4) {
+                        VertexId t5 = candidates_4[candidate_pos_4];
+                        Distance gain_3 = gain_2 - data.candidate_distances[t4][candidate_pos_4];
+                        if (gain_3 <= 0)
+                            continue;
+                        if (t5 == tour.next(t4) || t5 == tour.previous(t4))
+                            continue;
+                        for (VertexId t6: {tour.next(t5), tour.previous(t5)}) {
+                            if (t6 == t1 || is_removed(t.data(), 2, t5, t6))
+                                continue;
+                            Distance gain = gain_3
+                                + data.distances.distance(t5, t6)
+                                - data.distances.distance(t6, t1);
+                            if (gain <= 0)
+                                continue;
+                            t[4] = t5;
+                            t[5] = t6;
+                            move.start(tour, t.data());
+                            int number_of_cycles = move.count_cycles(tour, t.data(), 3);
+                            if (number_of_cycles == 1) {
+                                apply_improving_move(data, t.data(), 3, gain);
+                                return true;
+                            }
+                            if (number_of_cycles == 2 && join_cycles(data, t, 3, gain))
+                                return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
 /** Run Lin-Kernighan steps until no active vertex remains. */
 template <typename Distances>
 void lin_kernighan_local_search(
         LinKernighanData<Distances>& data)
 {
-    while (data.queue_start < (VertexId)data.queue.size()) {
-        VertexId t1 = data.queue[data.queue_start];
-        data.queue_start++;
-        data.in_queue[t1] = false;
-        bool improved = (data.parameters.move_type <= 2)?
-            lin_kernighan_improve(data, t1):
-            lin_kernighan_improve_k_opt(data, t1);
-        if (improved) {
-            activate(data, t1);
-            // Back to a local optimum already reached: this search would
-            // end there again.
-            if (data.local_optima.count(data.tour_hash)) {
-                for (VertexId pos = data.queue_start; pos < (VertexId)data.queue.size(); ++pos)
-                    data.in_queue[data.queue[pos]] = false;
-                data.queue_start = data.queue.size();
-                break;
+    for (;;) {
+        while (data.queue_start < (VertexId)data.queue.size()) {
+            VertexId t1 = data.queue[data.queue_start];
+            data.queue_start++;
+            data.in_queue[t1] = false;
+            bool improved = (data.parameters.move_type <= 2)?
+                lin_kernighan_improve(data, t1):
+                lin_kernighan_improve_k_opt(data, t1);
+            if (improved) {
+                activate(data, t1);
+                // Back to a local optimum already reached: this search would
+                // end there again.
+                if (data.local_optima.count(data.tour_hash)) {
+                    for (VertexId pos = data.queue_start; pos < (VertexId)data.queue.size(); ++pos)
+                        data.in_queue[data.queue[pos]] = false;
+                    data.queue_start = data.queue.size();
+                    break;
+                }
+            }
+            if (data.queue_start > 4096 && 2 * data.queue_start > (VertexId)data.queue.size()) {
+                data.queue.erase(data.queue.begin(), data.queue.begin() + data.queue_start);
+                data.queue_start = 0;
             }
         }
-        if (data.queue_start > 4096 && 2 * data.queue_start > (VertexId)data.queue.size()) {
-            data.queue.erase(data.queue.begin(), data.queue.begin() + data.queue_start);
-            data.queue_start = 0;
+        data.queue.clear();
+        data.queue_start = 0;
+        // A new local optimum: try to escape it with a non-sequential move.
+        if (data.local_optima.count(data.tour_hash))
+            break;
+        data.local_optima.insert(data.tour_hash);
+        if (!data.parameters.non_sequential_moves
+                || !non_sequential_search(data)) {
+            break;
         }
     }
-    data.queue.clear();
-    data.queue_start = 0;
-    data.local_optima.insert(data.tour_hash);
 }
 
 /**
@@ -976,9 +1312,14 @@ const Output lin_kernighan(
         data.vertex_hashes[vertex_id] = data.generator() | 1;
     compute_tour_hash(data);
     data.candidate_distances.resize(number_of_vertices);
-    for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id)
-        for (VertexId candidate_id: data.candidates[vertex_id])
-            data.candidate_distances[vertex_id].push_back(distances.distance(vertex_id, candidate_id));
+    data.cheapest_candidates.assign(number_of_vertices, {{{0, -1}, {0, -1}, {0, -1}}});
+    for (VertexId vertex_id = 0; vertex_id < number_of_vertices; ++vertex_id) {
+        for (VertexId candidate_id: data.candidates[vertex_id]) {
+            Distance distance = distances.distance(vertex_id, candidate_id);
+            data.candidate_distances[vertex_id].push_back(distance);
+            add_cheapest_candidate(data, vertex_id, candidate_id, distance);
+        }
+    }
     algorithm_formatter.update_solution(lin_kernighan_solution(data), "greedy edge");
     if (number_of_vertices < 8) {
         algorithm_formatter.end();

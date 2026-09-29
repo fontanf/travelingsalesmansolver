@@ -114,39 +114,8 @@ public:
             const VertexId* t,
             int k)
     {
-        for (int level = sorted_level_ + 1; level < k; ++level)
-            extend(tour, t, level);
-        if (sorted_level_ < k - 1)
-            sorted_level_ = k - 1;
-        k_ = k;
-        int number_of_ends = 2 * k;
-        const std::array<int, 2 * maximum_k>& order = orders_[k - 1];
-        for (int rank = 0; rank < number_of_ends; ++rank)
-            ends_[order[rank]].rank = rank;
-
-        // Segments: the paths between consecutive removed edges. If the
-        // first end's removed edge goes forward, the removed edges are the
-        // pairs of ranks (0, 1), (2, 3), ... and the segments go from rank
-        // 1 to 2, 3 to 4, ..., 2k - 1 to 0. Otherwise, the removed edges
-        // are the pairs (2k - 1, 0), (1, 2), ... and the segments go from
-        // rank 0 to 1, 2 to 3, ...
-        int shift = (ends_[order[0]].backward)? 0: 1;
-        for (int segment_id = 0; segment_id < k; ++segment_id) {
-            int first_end = order[(2 * segment_id + shift) % number_of_ends];
-            int last_end = order[(2 * segment_id + shift + 1) % number_of_ends];
-            segments_[segment_id] = {first_end, last_end};
-            ends_[first_end].segment_id = segment_id;
-            ends_[last_end].segment_id = segment_id;
-            ends_[first_end].is_first = true;
-            ends_[last_end].is_first = false;
-        }
-        // Check that the removed edges are the pairs expected above.
-        for (int segment_id = 0; segment_id < k; ++segment_id) {
-            int last_end = segments_[segment_id].second;
-            int first_end_next = segments_[(segment_id + 1) % k].first;
-            if ((last_end ^ 1) != first_end_next)
-                return false;
-        }
+        if (!build_segments(tour, t, k))
+            return false;
 
         // Follow the new cycle from the first end of segment 0: along the
         // segment, then through the added edge leaving its other end.
@@ -168,45 +137,98 @@ public:
     }
 
     /**
-     * Prepare to check closings at level k with 'is_valid_last', the first
-     * k - 1 removed edges being fixed.
+     * Count the cycles made by the move built incrementally, closed after its
+     * first k removed edges (0 if its removed edges aren't tour edges).
      */
-    inline void start_last_level()
-    {
-        last_level_validities_.fill(-1);
-    }
-
-    /**
-     * Same as 'is_valid', when neither end of the last removed edge
-     * (t[2k - 2], t[2k - 1]) is an end of a previous removed edge.
-     *
-     * The validity then only depends on the gap between the sorted ends of
-     * the previous removed edges containing the last removed edge, and on
-     * its direction; it's memorized for each of them until the next call to
-     * 'start_last_level'. When it's memorized, the move itself isn't
-     * analyzed: call 'is_valid' before applying it.
-     */
-    bool is_valid_last(
+    int count_cycles(
             const TwoLevelList& tour,
             const VertexId* t,
             int k)
     {
-        for (int level = sorted_level_ + 1; level < k - 1; ++level)
-            extend(tour, t, level);
-        if (sorted_level_ < k - 2)
-            sorted_level_ = k - 2;
-        int end = 2 * k - 2;
-        set_end(tour, t, end);
-        const std::array<int, 2 * maximum_k>& order = orders_[k - 2];
-        int number_of_ends = 2 * k - 2;
-        int gap = 0;
-        while (gap < number_of_ends && before(tour, order[gap], end))
-            ++gap;
-        int8_t& validity = last_level_validities_[2 * gap + ends_[end].backward];
-        if (validity < 0)
-            validity = is_valid(tour, t, k);
-        return validity;
+        if (!build_segments(tour, t, k))
+            return 0;
+        for (int segment_id = 0; segment_id < k; ++segment_id)
+            segment_cycles_[segment_id] = -1;
+        int number_of_cycles = 0;
+        for (int segment_id = 0; segment_id < k; ++segment_id) {
+            if (segment_cycles_[segment_id] != -1)
+                continue;
+            int start_end = segments_[segment_id].first;
+            int end = start_end;
+            do {
+                segment_cycles_[ends_[end].segment_id] = number_of_cycles;
+                int other_end = (ends_[end].is_first)?
+                    segments_[ends_[end].segment_id].second:
+                    segments_[ends_[end].segment_id].first;
+                end = added_partner(other_end);
+            } while (end != start_end);
+            number_of_cycles++;
+        }
+        return number_of_cycles;
     }
+
+    /** Number of segments of the last analyzed move. */
+    inline int number_of_segments() const { return k_; }
+
+    /** First vertex (along 'next') of a segment of the last analyzed move. */
+    inline VertexId segment_first_vertex(int segment_id) const
+    {
+        return ends_[segments_[segment_id].first].vertex_id;
+    }
+
+    /** Last vertex (along 'next') of a segment of the last analyzed move. */
+    inline VertexId segment_last_vertex(int segment_id) const
+    {
+        return ends_[segments_[segment_id].second].vertex_id;
+    }
+
+    /** Cycle of a segment, after 'count_cycles'. */
+    inline int segment_cycle(int segment_id) const
+    {
+        return segment_cycles_[segment_id];
+    }
+
+    /** Segment containing a vertex, for the last analyzed move. */
+    int segment(
+            const TwoLevelList& tour,
+            VertexId vertex_id) const
+    {
+        int number_of_ends = 2 * k_;
+        for (int end = 0; end < number_of_ends; ++end)
+            if (ends_[end].vertex_id == vertex_id)
+                return ends_[end].segment_id;
+        // Number of ends before the vertex, along the tour from the origin.
+        int64_t position = tour.position(vertex_id);
+        if (position < origin_position_)
+            position += tour_size_;
+        int number_of_ends_before = 0;
+        for (int end = 0; end < number_of_ends; ++end)
+            if (!ends_[end].wraps && ends_[end].position < position)
+                number_of_ends_before++;
+        // The vertex is between the ends of ranks r and r + 1.
+        int rank = (number_of_ends_before == 0)? number_of_ends - 1: number_of_ends_before - 1;
+        int shifted_rank = rank - shift_;
+        if (shifted_rank < 0)
+            shifted_rank += number_of_ends;
+        return shifted_rank / 2;
+    }
+
+    /**
+     * Use explicit added edges instead of the sequential ones: end 'end' is
+     * joined to end 'partners[end]', for the 2k ends of the next analyzed
+     * moves, until 'clear_added_partners' is called.
+     */
+    void set_added_partners(
+            const int* partners,
+            int k)
+    {
+        for (int end = 0; end < 2 * k; ++end)
+            partners_[end] = partners[end];
+        use_partners_ = true;
+    }
+
+    /** Back to sequential moves. */
+    inline void clear_added_partners() { use_partners_ = false; }
 
     /**
      * Apply the last analyzed move (which must be valid) to 'tour', as a
@@ -263,13 +285,60 @@ public:
 
 private:
 
+    /**
+     * Sort the ends of the first k removed edges of the move built
+     * incrementally, and build its segments. Return 'false' if the removed
+     * edges aren't consistent with the tour.
+     */
+    bool build_segments(
+            const TwoLevelList& tour,
+            const VertexId* t,
+            int k,
+            bool check = true)
+    {
+        for (int level = sorted_level_ + 1; level < k; ++level)
+            extend(tour, t, level);
+        if (sorted_level_ < k - 1)
+            sorted_level_ = k - 1;
+        k_ = k;
+        int number_of_ends = 2 * k;
+        const std::array<int, 2 * maximum_k>& order = orders_[k - 1];
+
+        // Segments: the paths between consecutive removed edges. If the
+        // first end's removed edge goes forward, the removed edges are the
+        // pairs of ranks (0, 1), (2, 3), ... and the segments go from rank
+        // 1 to 2, 3 to 4, ..., 2k - 1 to 0. Otherwise, the removed edges
+        // are the pairs (2k - 1, 0), (1, 2), ... and the segments go from
+        // rank 0 to 1, 2 to 3, ...
+        shift_ = (ends_[order[0]].backward)? 0: 1;
+        for (int segment_id = 0; segment_id < k; ++segment_id) {
+            // (No modulo: divisions are slow.)
+            int first_rank = 2 * segment_id + shift_;
+            int last_rank = (first_rank + 1 == number_of_ends)? 0: first_rank + 1;
+            int first_end = order[first_rank];
+            int last_end = order[last_rank];
+            segments_[segment_id] = {first_end, last_end};
+            ends_[first_end].segment_id = segment_id;
+            ends_[last_end].segment_id = segment_id;
+            ends_[first_end].is_first = true;
+            ends_[last_end].is_first = false;
+        }
+        // Check that the removed edges are the pairs expected above.
+        for (int segment_id = 0; check && segment_id < k; ++segment_id) {
+            int last_end = segments_[segment_id].second;
+            int first_end_next = segments_[(segment_id + 1 == k)? 0: segment_id + 1].first;
+            if ((last_end ^ 1) != first_end_next)
+                return false;
+        }
+        return true;
+    }
+
     struct End
     {
         VertexId vertex_id;
         int64_t position;
         bool backward;
         bool wraps;
-        int rank;
         int segment_id;
         bool is_first;
     };
@@ -316,11 +385,13 @@ private:
     /** Get the end at the other end of the added edge at 'end'. */
     inline int added_partner(int end) const
     {
+        if (use_partners_)
+            return partners_[end];
         // Added edges: (t[2i + 1], t[2i + 2]), and (t[2k - 1], t[0]).
         int number_of_ends = 2 * k_;
-        return (end % 2 == 1)?
-            (end + 1) % number_of_ends:
-            (end + number_of_ends - 1) % number_of_ends;
+        if (end & 1)
+            return (end + 1 == number_of_ends)? 0: end + 1;
+        return (end == 0)? number_of_ends - 1: end - 1;
     }
 
     /** First vertex of a signed segment, in arrangement order. */
@@ -422,8 +493,18 @@ private:
     /** Segments: (first end, last end), in tour order. */
     std::array<std::pair<int, int>, maximum_k> segments_;
 
-    /** For each gap and direction of the last removed edge: -1 if unknown, else its validity. */
-    std::array<int8_t, 4 * maximum_k> last_level_validities_;
+
+    /** 0 if the segments start at even ranks, 1 otherwise. */
+    int shift_ = 0;
+
+    /** Cycle of each segment, after 'count_cycles'. */
+    std::array<int, maximum_k> segment_cycles_;
+
+    /** Explicit added edges ('set_added_partners'). */
+    std::array<int, 2 * maximum_k> partners_;
+
+    /** Whether to use 'partners_' instead of the sequential added edges. */
+    bool use_partners_ = false;
 
     /** Reversal sequences already computed, by target arrangement. */
     std::unordered_map<uint64_t, std::vector<std::array<int, 2>>> cache_;
