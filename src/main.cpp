@@ -75,6 +75,8 @@ Output run(
             parameters.move_type = vm["move-type"].as<int>();
         if (vm.count("restricted-search"))
             parameters.restricted_search = vm["restricted-search"].as<bool>();
+        if (vm.count("non-sequential-moves"))
+            parameters.non_sequential_moves = vm["non-sequential-moves"].as<bool>();
         if (vm.count("perturbation"))
             parameters.perturbation = vm["perturbation"].as<std::string>();
         if (vm.count("maximum-number-of-kicks"))
@@ -117,6 +119,7 @@ int main(int argc, char *argv[])
         ("move-type,", po::value<int>(), "set move type: 2 (chained LK) to 5 (LKH-style 5-opt steps) (lin-kernighan)")
         ("perturbation,", po::value<std::string>(), "set perturbation: kicks or trials (lin-kernighan)")
         ("restricted-search,", po::value<bool>(), "set restricted search (lin-kernighan)")
+        ("non-sequential-moves,", po::value<bool>(), "set non-sequential moves (lin-kernighan)")
         ("maximum-depth,", po::value<int>(), "set maximum number of steps in a chain (lin-kernighan)")
         ;
     po::variables_map vm;
