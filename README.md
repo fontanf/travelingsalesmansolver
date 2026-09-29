@@ -12,6 +12,8 @@ This package provides wrappers to call [Concord TSP Solver](https://www.math.uwa
 
 Both solvers are called through system calls. Inputs and outputs are handled through files. It is required to have the `concorde` and the `LKH` executables in the path.
 
+It also implements an LKH-style Lin-Kernighan (algorithm `lin-kernighan`: sequential moves of up to 5 edges, non-sequential moves, trials merged by iterative partial transcription), written from the published descriptions (no LKH code). Its core is a problem-generic engine (`include/travelingsalesmansolver/lin_kernighan/engine.hpp`), meant to be reused by Lin-Kernighan algorithms for other problems: a problem class gives the costs of the edges guiding the search and, if needed, evaluates the moves exactly (see the documentation at the top of the file).
+
 ## Usage (command line)
 
 Compile:
