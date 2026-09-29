@@ -4,8 +4,16 @@ using namespace travelingsalesmansolver;
 
 const Output travelingsalesmansolver::lin_kernighan(
         const Instance& instance,
-        const LinKernighanParameters& parameters)
+        const LinKernighanParameters& parameters,
+        const Solution* initial_solution)
 {
+    if (initial_solution != nullptr
+            && (&initial_solution->instance() != &instance
+                || !initial_solution->feasible())) {
+        throw std::invalid_argument(
+                "travelingsalesmansolver::lin_kernighan: "
+                "the initial solution must be a feasible solution of the instance.");
+    }
     if (parameters.move_type < 3
             || parameters.move_type > SequentialMovePatterns::maximum_number_of_removed_edges) {
         throw std::invalid_argument(
@@ -27,5 +35,6 @@ const Output travelingsalesmansolver::lin_kernighan(
             lin_kernighan,
             instance.distances(),
             instance,
-            parameters);
+            parameters,
+            initial_solution);
 }

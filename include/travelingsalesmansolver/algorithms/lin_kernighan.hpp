@@ -3,7 +3,7 @@
 #include "travelingsalesmansolver/algorithm_formatter.hpp"
 #include "travelingsalesmansolver/solution_builder.hpp"
 #include "travelingsalesmansolver/lin_kernighan/engine.hpp"
-#include "travelingsalesmansolver/lin_kernighan/greedy.hpp"
+#include "travelingsalesmansolver/algorithms/greedy.hpp"
 
 namespace travelingsalesmansolver
 {
@@ -80,18 +80,23 @@ struct LinKernighanParameters: Parameters
 
 /**
  * LKH-style Lin-Kernighan for the TSP (see 'lin_kernighan/engine.hpp'):
- * nearest neighbor candidates, a greedy edge initial tour, and the engine,
- * minimizing the length of the tour.
+ * nearest neighbor candidates and the engine, minimizing the length of the
+ * tour.
+ *
+ * 'initial_solution', if provided, is the initial tour (a 'greedy' tour is
+ * built otherwise). It must be a feasible solution of the same 'instance'.
  */
 const Output lin_kernighan(
         const Instance& instance,
-        const LinKernighanParameters& parameters = {});
+        const LinKernighanParameters& parameters = {},
+        const Solution* initial_solution = nullptr);
 
 template <typename Distances>
 const Output lin_kernighan(
         const Distances& distances,
         const Instance& instance,
-        const LinKernighanParameters& parameters = {});
+        const LinKernighanParameters& parameters = {},
+        const Solution* initial_solution = nullptr);
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -150,17 +155,29 @@ template <typename Distances>
 const Output lin_kernighan(
         const Distances& distances,
         const Instance& instance,
-        const LinKernighanParameters& parameters)
+        const LinKernighanParameters& parameters,
+        const Solution* initial_solution)
 {
     Output output(instance);
     AlgorithmFormatter algorithm_formatter(parameters, output);
     algorithm_formatter.start("Lin-Kernighan");
     algorithm_formatter.print_header();
 
+    std::vector<VertexId> initial_tour;
+    if (initial_solution != nullptr) {
+        for (VertexId pos = 0; pos < initial_solution->number_of_vertices(); ++pos)
+            initial_tour.push_back(initial_solution->vertex_id(pos));
+    } else {
+        GreedyParameters greedy_parameters;
+        greedy_parameters.verbosity_level = 0;
+        greedy_parameters.number_of_candidates = parameters.number_of_candidates;
+        Output greedy_output = greedy(distances, instance, greedy_parameters);
+        for (VertexId pos = 0; pos < greedy_output.solution.number_of_vertices(); ++pos)
+            initial_tour.push_back(greedy_output.solution.vertex_id(pos));
+    }
     CandidateLists candidates = nearest_neighbor_candidates(
             instance.distances(),
             parameters.number_of_candidates);
-    std::vector<VertexId> initial_tour = greedy_edge_tour(distances, candidates);
 
     lin_kernighan_engine::EngineParameters engine_parameters;
     engine_parameters.move_type = parameters.move_type;
