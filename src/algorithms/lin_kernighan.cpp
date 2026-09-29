@@ -5,7 +5,8 @@ using namespace travelingsalesmansolver;
 const Output travelingsalesmansolver::lin_kernighan(
         const Instance& instance,
         const LinKernighanParameters& parameters,
-        const Solution* initial_solution)
+        const Solution* initial_solution,
+        const CandidateLists* candidates)
 {
     if (initial_solution != nullptr
             && (&initial_solution->instance() != &instance
@@ -22,6 +23,14 @@ const Output travelingsalesmansolver::lin_kernighan(
                 + std::to_string(SequentialMovePatterns::maximum_number_of_removed_edges)
                 + "; move type: " + std::to_string(parameters.move_type) + ".");
     }
+    if (candidates != nullptr
+            && (VertexId)candidates->size() != instance.number_of_vertices()) {
+        throw std::invalid_argument(
+                "travelingsalesmansolver::lin_kernighan: "
+                "wrong number of candidate lists; "
+                "candidates->size(): " + std::to_string(candidates->size()) + "; "
+                "instance.number_of_vertices(): " + std::to_string(instance.number_of_vertices()) + ".");
+    }
 
     // Like LKH, precompute the distance matrix when the instance is small
     // enough, to avoid recomputing distances in the inner loop.
@@ -36,5 +45,6 @@ const Output travelingsalesmansolver::lin_kernighan(
             instance.distances(),
             instance,
             parameters,
-            initial_solution);
+            initial_solution,
+            candidates);
 }

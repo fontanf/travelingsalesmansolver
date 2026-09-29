@@ -14,6 +14,10 @@ Both solvers are called through system calls. Inputs and outputs are handled thr
 
 It also implements an LKH-style Lin-Kernighan (algorithm `lin-kernighan`: sequential moves of up to 5 edges, non-sequential moves, trials merged by iterative partial transcription), written from the published descriptions (no LKH code). Its core is a problem-generic engine (`include/travelingsalesmansolver/lin_kernighan/engine.hpp`), meant to be reused by Lin-Kernighan algorithms for other problems: a problem class gives the costs of the edges guiding the search and, if needed, evaluates the moves exactly (see the documentation at the top of the file).
 
+Candidate edges (`include/travelingsalesmansolver/candidates/`), given to the algorithms as an optional argument (command line: `--candidates`):
+* `nearest_neighbor_candidates`: the nearest neighbors of each vertex (default)
+* `alpha_nearness_candidates`: alpha-nearness (Helsgaun, 2000), computed from 1-trees with vertex penalties optimized by a subgradient ascent, on a sparse graph (nearest neighbors, and nearest neighbors in each octant for coordinate-based distances) or on the complete graph
+
 ## Usage (command line)
 
 Compile:

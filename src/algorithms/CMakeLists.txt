@@ -22,7 +22,8 @@ target_sources(TravelingSalesmanSolver_greedy PRIVATE
 target_include_directories(TravelingSalesmanSolver_greedy PUBLIC
     ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(TravelingSalesmanSolver_greedy PUBLIC
-    TravelingSalesmanSolver_traveling_salesman)
+    TravelingSalesmanSolver_traveling_salesman
+    TravelingSalesmanSolver_candidates)
 add_library(TravelingSalesmanSolver::greedy ALIAS TravelingSalesmanSolver_greedy)
 
 add_library(TravelingSalesmanSolver_lin_kernighan)

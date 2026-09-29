@@ -1,7 +1,7 @@
 #pragma once
 
 #include "travelingsalesmansolver/lin_kernighan/two_level_list.hpp"
-#include "travelingsalesmansolver/lin_kernighan/candidates.hpp"
+#include "travelingsalesmansolver/candidates/candidate_lists.hpp"
 #include "travelingsalesmansolver/lin_kernighan/k_opt_move.hpp"
 #include "travelingsalesmansolver/lin_kernighan/sequential_move_patterns.hpp"
 #include "travelingsalesmansolver/lin_kernighan/tour_merging.hpp"

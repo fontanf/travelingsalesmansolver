@@ -1,6 +1,6 @@
 #pragma once
 
-#include "travelingsalesmansolver/lin_kernighan/candidates.hpp"
+#include "travelingsalesmansolver/candidates/candidate_lists.hpp"
 
 #include <algorithm>
 #include <array>

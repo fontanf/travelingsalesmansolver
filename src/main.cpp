@@ -2,6 +2,7 @@
 #include "travelingsalesmansolver/algorithms/concorde.hpp"
 #include "travelingsalesmansolver/algorithms/greedy.hpp"
 #include "travelingsalesmansolver/algorithms/lin_kernighan.hpp"
+#include "travelingsalesmansolver/candidates/alpha_nearness.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -38,17 +39,61 @@ void read_args(
     }
 }
 
+/**
+ * Compute the candidates given by the '--candidates' option ('nullptr'
+ * output: the algorithm's default).
+ */
+std::unique_ptr<CandidateLists> compute_candidates(
+        const Instance& instance,
+        const po::variables_map& vm)
+{
+    if (!vm.count("candidates"))
+        return nullptr;
+    std::string type = vm["candidates"].as<std::string>();
+    optimizationtools::Timer timer;
+    std::unique_ptr<CandidateLists> candidates;
+    if (type == "nearest-neighbor") {
+        VertexId number_of_candidates = (vm.count("number-of-candidates"))?
+            vm["number-of-candidates"].as<VertexId>(): 10;
+        candidates = std::make_unique<CandidateLists>(
+                nearest_neighbor_candidates(instance.distances(), number_of_candidates));
+    } else if (type == "alpha-nearness") {
+        AlphaNearnessParameters parameters;
+        if (vm.count("number-of-candidates"))
+            parameters.number_of_candidates = vm["number-of-candidates"].as<VertexId>();
+        if (vm.count("ascent-graph-number-of-nearest-neighbors"))
+            parameters.number_of_nearest_neighbors = vm["ascent-graph-number-of-nearest-neighbors"].as<VertexId>();
+        if (vm.count("ascent-initial-period"))
+            parameters.initial_period = vm["ascent-initial-period"].as<int64_t>();
+        AlphaNearnessOutput output = alpha_nearness_candidates(instance.distances(), parameters);
+        if (!vm.count("verbosity-level") || vm["verbosity-level"].as<int>() > 0) {
+            std::cout
+                << "Alpha-nearness candidates: "
+                << "lower bound " << output.lower_bound
+                << ", " << output.number_of_iterations << " iterations"
+                << ", " << timer.elapsed_time() << " s" << std::endl;
+        }
+        candidates = std::make_unique<CandidateLists>(std::move(output.candidates));
+    } else {
+        throw std::invalid_argument(
+                "Unknown candidates \"" + type + "\".");
+    }
+    return candidates;
+}
+
 Output run(
         const Instance& instance,
         const po::variables_map& vm)
 {
     std::mt19937_64 generator(vm["seed"].as<Seed>());
     Solution solution(instance, vm["initial-solution"].as<std::string>());
+    std::unique_ptr<CandidateLists> candidates = compute_candidates(instance, vm);
 
     // Run algorithm.
     std::string algorithm = vm["algorithm"].as<std::string>();
     if (algorithm == "lkh") {
         LkhParameters parameters;
+        parameters.seed = std::to_string(vm["seed"].as<Seed>());
         if (vm.count("candidate-set-type"))
             parameters.candidate_set_type = vm["candidate-set-type"].as<std::string>();
         if (vm.count("initial-period"))
@@ -69,7 +114,7 @@ Output run(
         read_args(parameters, vm);
         if (vm.count("number-of-candidates"))
             parameters.number_of_candidates = vm["number-of-candidates"].as<VertexId>();
-        return greedy(instance, parameters);
+        return greedy(instance, parameters, candidates.get());
 
     } else if (algorithm == "lin-kernighan") {
         LinKernighanParameters parameters;
@@ -89,7 +134,7 @@ Output run(
             parameters.perturbation = vm["perturbation"].as<std::string>();
         if (vm.count("maximum-number-of-trials"))
             parameters.maximum_number_of_trials = vm["maximum-number-of-trials"].as<int64_t>();
-        return lin_kernighan(instance, parameters);
+        return lin_kernighan(instance, parameters, nullptr, candidates.get());
 
     } else {
         throw std::invalid_argument(
@@ -122,7 +167,10 @@ int main(int argc, char *argv[])
         ("runs,", po::value<std::string>(), "set runs")
         ("max-trials,", po::value<std::string>(), "set max trials")
 
+        ("candidates,", po::value<std::string>(), "set candidates: nearest-neighbor or alpha-nearness (greedy, lin-kernighan)")
         ("number-of-candidates,", po::value<VertexId>(), "set number of candidates (greedy, lin-kernighan)")
+        ("ascent-graph-number-of-nearest-neighbors,", po::value<VertexId>(), "set number of nearest neighbors of the graph of the ascent, -1 for the complete graph (alpha-nearness)")
+        ("ascent-initial-period,", po::value<int64_t>(), "set initial period of the ascent (alpha-nearness)")
         ("maximum-number-of-trials,", po::value<int64_t>(), "set maximum number of trials or kicks (lin-kernighan)")
         ("move-type,", po::value<int>(), "set move type: 3 to 5 (lin-kernighan)")
         ("perturbation,", po::value<std::string>(), "set perturbation: walks, double-bridge or segment-swap (lin-kernighan)")
