@@ -23,6 +23,7 @@ if(TRAVELINGSALESMANSOLVER_BUILD_MAIN)
   target_link_libraries(TravelingSalesmanSolver_main PUBLIC
       TravelingSalesmanSolver_lkh
       TravelingSalesmanSolver_concorde
+      TravelingSalesmanSolver_greedy
       TravelingSalesmanSolver_lin_kernighan
       Boost::program_options)
   set_target_properties(TravelingSalesmanSolver_main PROPERTIES OUTPUT_NAME "travelingsalesmansolver")

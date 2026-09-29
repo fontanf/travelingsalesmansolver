@@ -1,5 +1,6 @@
 #include "travelingsalesmansolver/algorithms/lkh.hpp"
 #include "travelingsalesmansolver/algorithms/concorde.hpp"
+#include "travelingsalesmansolver/algorithms/greedy.hpp"
 #include "travelingsalesmansolver/algorithms/lin_kernighan.hpp"
 
 #include <boost/program_options.hpp>
@@ -63,6 +64,13 @@ Output run(
         read_args(parameters, vm);
         return concorde(instance, parameters);
 
+    } else if (algorithm == "greedy") {
+        GreedyParameters parameters;
+        read_args(parameters, vm);
+        if (vm.count("number-of-candidates"))
+            parameters.number_of_candidates = vm["number-of-candidates"].as<VertexId>();
+        return greedy(instance, parameters);
+
     } else if (algorithm == "lin-kernighan") {
         LinKernighanParameters parameters;
         read_args(parameters, vm);
@@ -114,7 +122,7 @@ int main(int argc, char *argv[])
         ("runs,", po::value<std::string>(), "set runs")
         ("max-trials,", po::value<std::string>(), "set max trials")
 
-        ("number-of-candidates,", po::value<VertexId>(), "set number of candidates (lin-kernighan)")
+        ("number-of-candidates,", po::value<VertexId>(), "set number of candidates (greedy, lin-kernighan)")
         ("maximum-number-of-trials,", po::value<int64_t>(), "set maximum number of trials or kicks (lin-kernighan)")
         ("move-type,", po::value<int>(), "set move type: 3 to 5 (lin-kernighan)")
         ("perturbation,", po::value<std::string>(), "set perturbation: walks, double-bridge or segment-swap (lin-kernighan)")
