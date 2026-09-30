@@ -4,14 +4,37 @@
 #include "travelingsalesmansolver/solution_builder.hpp"
 #include "travelingsalesmansolver/lin_kernighan/engine.hpp"
 #include "travelingsalesmansolver/algorithms/greedy.hpp"
+#include "travelingsalesmansolver/candidates/alpha_nearness.hpp"
 
 namespace travelingsalesmansolver
 {
 
 struct LinKernighanParameters: Parameters
 {
-    /** Number of candidate edges per vertex (nearest neighbors), if no candidates are given. */
-    VertexId number_of_candidates = 10;
+    /** Number of candidate edges per vertex, if no candidates are given. */
+    VertexId number_of_candidates = 5;
+
+    /**
+     * Candidates, if none are given: "alpha-nearness"
+     * ('alpha_nearness_candidates') or "nearest-neighbor"
+     * ('nearest_neighbor_candidates').
+     */
+    std::string candidates = "alpha-nearness";
+
+    /**
+     * With alpha-nearness candidates computed by 'lin_kernighan' (none
+     * given), guide the search with the costs penalized by their ascent,
+     * 'precision * d(i, j) + pi[i] + pi[j]' (as LKH). (It didn't improve
+     * the results on TSPLIB instances, unlike for routingsolver's min-max
+     * mTSP.)
+     */
+    bool penalized_costs = false;
+
+    /**
+     * Initial period of the ascent of the alpha-nearness candidates ('-1':
+     * 100 from 10000 vertices, the default of the ascent otherwise).
+     */
+    int64_t ascent_initial_period = -1;
 
     /**
      * Size of the steps of a chain: moves of up to that many edges (3 to 5;
@@ -46,6 +69,9 @@ struct LinKernighanParameters: Parameters
         nlohmann::json json = Parameters::to_json();
         json.merge_patch({
                 {"NumberOfCandidates", number_of_candidates},
+                {"Candidates", candidates},
+                {"PenalizedCosts", penalized_costs},
+                {"AscentInitialPeriod", ascent_initial_period},
                 {"MoveType", move_type},
                 {"MaximumDepth", maximum_depth},
                 {"Perturbation", perturbation},
@@ -66,6 +92,9 @@ struct LinKernighanParameters: Parameters
         int width = format_width();
         os
             << std::setw(width) << std::left << "Number of candidates: " << number_of_candidates << std::endl
+            << std::setw(width) << std::left << "Candidates: " << candidates << std::endl
+            << std::setw(width) << std::left << "Penalized costs: " << penalized_costs << std::endl
+            << std::setw(width) << std::left << "Ascent initial period: " << ascent_initial_period << std::endl
             << std::setw(width) << std::left << "Move type: " << move_type << std::endl
             << std::setw(width) << std::left << "Maximum depth: " << maximum_depth << std::endl
             << std::setw(width) << std::left << "Perturbation: " << perturbation << std::endl
@@ -87,14 +116,19 @@ struct LinKernighanParameters: Parameters
  * built otherwise). It must be a feasible solution of the same 'instance'.
  *
  * 'candidates', if provided, are the candidate edges of each vertex, best
- * first (e.g. 'alpha_nearness_candidates'); otherwise, the
- * 'parameters.number_of_candidates' nearest neighbors.
+ * first; otherwise, 'parameters.number_of_candidates' candidates are
+ * computed as given by 'parameters.candidates' (alpha-nearness ones, whose
+ * penalties then guide the search if 'parameters.penalized_costs').
+ *
+ * 'penalties', if provided, are penalties of the vertices guiding the search
+ * (see 'LinKernighanTspProblem::pi').
  */
 const Output lin_kernighan(
         const Instance& instance,
         const LinKernighanParameters& parameters = {},
         const Solution* initial_solution = nullptr,
-        const CandidateLists* candidates = nullptr);
+        const CandidateLists* candidates = nullptr,
+        const VertexPenalties* penalties = nullptr);
 
 template <typename Distances>
 const Output lin_kernighan(
@@ -102,7 +136,8 @@ const Output lin_kernighan(
         const Instance& instance,
         const LinKernighanParameters& parameters = {},
         const Solution* initial_solution = nullptr,
-        const CandidateLists* candidates = nullptr);
+        const CandidateLists* candidates = nullptr,
+        const VertexPenalties* penalties = nullptr);
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -125,11 +160,21 @@ struct LinKernighanTspProblem
 
     AlgorithmFormatter& algorithm_formatter;
 
+    /**
+     * Penalties of the vertices ('nullptr': none): the costs guiding the
+     * search are then 'precision * d(i, j) + pi[i] + pi[j]'. They cancel out
+     * in the cost of a tour (up to a constant), but change the partial gains.
+     */
+    const VertexPenalties* penalties = nullptr;
+
     inline VertexId number_of_vertices() const { return instance.number_of_vertices(); }
 
     inline Distance cost(VertexId vertex_id_1, VertexId vertex_id_2) const
     {
-        return distances.distance(vertex_id_1, vertex_id_2);
+        if (penalties == nullptr)
+            return distances.distance(vertex_id_1, vertex_id_2);
+        return penalties->precision * distances.distance(vertex_id_1, vertex_id_2)
+            + penalties->pi[vertex_id_1] + penalties->pi[vertex_id_2];
     }
 
     inline bool candidate_edge(VertexId, VertexId) const { return true; }
@@ -163,13 +208,15 @@ const Output lin_kernighan(
         const Instance& instance,
         const LinKernighanParameters& parameters,
         const Solution* initial_solution,
-        const CandidateLists* candidates)
+        const CandidateLists* candidates,
+        const VertexPenalties* penalties)
 {
     Output output(instance);
     AlgorithmFormatter algorithm_formatter(parameters, output);
     algorithm_formatter.start("Lin-Kernighan");
     algorithm_formatter.print_header();
 
+    // (The non-template 'lin_kernighan' computes the default candidates.)
     CandidateLists candidate_lists = (candidates != nullptr)?
         *candidates:
         nearest_neighbor_candidates(
@@ -199,7 +246,7 @@ const Output lin_kernighan(
     engine_parameters.seed = parameters.seed;
     engine_parameters.needs_to_end = [&parameters]() { return parameters.timer.needs_to_end(); };
 
-    LinKernighanTspProblem<Distances> problem{distances, instance, algorithm_formatter};
+    LinKernighanTspProblem<Distances> problem{distances, instance, algorithm_formatter, penalties};
     lin_kernighan_engine::run(problem, engine_parameters, std::move(candidate_lists), initial_tour);
 
     algorithm_formatter.end();

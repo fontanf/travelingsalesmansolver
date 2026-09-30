@@ -87,7 +87,6 @@ Output run(
 {
     std::mt19937_64 generator(vm["seed"].as<Seed>());
     Solution solution(instance, vm["initial-solution"].as<std::string>());
-    std::unique_ptr<CandidateLists> candidates = compute_candidates(instance, vm);
 
     // Run algorithm.
     std::string algorithm = vm["algorithm"].as<std::string>();
@@ -114,6 +113,7 @@ Output run(
         read_args(parameters, vm);
         if (vm.count("number-of-candidates"))
             parameters.number_of_candidates = vm["number-of-candidates"].as<VertexId>();
+        std::unique_ptr<CandidateLists> candidates = compute_candidates(instance, vm);
         return greedy(instance, parameters, candidates.get());
 
     } else if (algorithm == "lin-kernighan") {
@@ -134,7 +134,13 @@ Output run(
             parameters.perturbation = vm["perturbation"].as<std::string>();
         if (vm.count("maximum-number-of-trials"))
             parameters.maximum_number_of_trials = vm["maximum-number-of-trials"].as<int64_t>();
-        return lin_kernighan(instance, parameters, nullptr, candidates.get());
+        if (vm.count("candidates"))
+            parameters.candidates = vm["candidates"].as<std::string>();
+        if (vm.count("penalized-costs"))
+            parameters.penalized_costs = vm["penalized-costs"].as<bool>();
+        if (vm.count("ascent-initial-period"))
+            parameters.ascent_initial_period = vm["ascent-initial-period"].as<int64_t>();
+        return lin_kernighan(instance, parameters);
 
     } else {
         throw std::invalid_argument(
@@ -171,6 +177,7 @@ int main(int argc, char *argv[])
         ("number-of-candidates,", po::value<VertexId>(), "set number of candidates (greedy, lin-kernighan)")
         ("ascent-graph-number-of-nearest-neighbors,", po::value<VertexId>(), "set number of nearest neighbors of the graph of the ascent, -1 for the complete graph (alpha-nearness)")
         ("ascent-initial-period,", po::value<int64_t>(), "set initial period of the ascent (alpha-nearness)")
+        ("penalized-costs,", po::value<bool>(), "guide the search with the costs penalized by the ascent of the alpha-nearness candidates (lin-kernighan)")
         ("maximum-number-of-trials,", po::value<int64_t>(), "set maximum number of trials or kicks (lin-kernighan)")
         ("move-type,", po::value<int>(), "set move type: 3 to 5 (lin-kernighan)")
         ("perturbation,", po::value<std::string>(), "set perturbation: walks, double-bridge or segment-swap (lin-kernighan)")

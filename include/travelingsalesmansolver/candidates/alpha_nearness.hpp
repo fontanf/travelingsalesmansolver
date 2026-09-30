@@ -95,6 +95,17 @@ struct AlphaNearnessOutput
  * (the special vertex) and its second nearest neighbor, the leaf being
  * chosen to maximize the length of that edge.
  */
+/**
+ * Penalties of the vertices, from the ascent of the alpha-nearness
+ * candidates ('AlphaNearnessOutput::pi', 'AlphaNearnessParameters::precision').
+ */
+struct VertexPenalties
+{
+    std::vector<Distance> pi;
+
+    Distance precision = 1;
+};
+
 AlphaNearnessOutput alpha_nearness_candidates(
         const Distances& distances,
         const AlphaNearnessParameters& parameters = {});
