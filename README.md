@@ -15,8 +15,10 @@ Both solvers are called through system calls. Inputs and outputs are handled thr
 It also implements an LKH-style Lin-Kernighan (algorithm `lin-kernighan`: sequential moves of up to 5 edges, non-sequential moves, trials merged by iterative partial transcription), written from the published descriptions (no LKH code). Its core is a problem-generic engine (`include/travelingsalesmansolver/lin_kernighan/engine.hpp`), meant to be reused by Lin-Kernighan algorithms for other problems: a problem class gives the costs of the edges guiding the search and, if needed, evaluates the moves exactly (see the documentation at the top of the file).
 
 Candidate edges (`include/travelingsalesmansolver/candidates/`), given to the algorithms as an optional argument (command line: `--candidates`):
-* `nearest_neighbor_candidates`: the nearest neighbors of each vertex (default)
-* `alpha_nearness_candidates`: alpha-nearness (Helsgaun, 2000), computed from 1-trees with vertex penalties optimized by a subgradient ascent, on a sparse graph (nearest neighbors, and nearest neighbors in each octant for coordinate-based distances) or on the complete graph
+* `nearest_neighbor_candidates`: the nearest neighbors of each vertex (default of `greedy`)
+* `alpha_nearness_candidates`: alpha-nearness (Helsgaun, 2000), computed from 1-trees with vertex penalties optimized by a subgradient ascent, on a sparse graph (nearest neighbors, and nearest neighbors in each octant for coordinate-based distances) or on the complete graph (default of `lin-kernighan`: 5 candidates; average gap to the optimum 0.07% instead of 0.31% with 10 nearest neighbors on rl5915, pla7397, rl11849 and usa13509, 60 s, 3 seeds; 0.01% instead of 0.22% on 7 instances of 783 to 4461 vertices, 30 s, 5 seeds)
+
+The Lin-Kernighan can also guide its search with the costs penalized by the ascent, `precision * d(i, j) + pi[i] + pi[j]`, as LKH (`--penalized-costs 1`); it didn't improve the results on TSPLIB instances.
 
 ## Usage (command line)
 
