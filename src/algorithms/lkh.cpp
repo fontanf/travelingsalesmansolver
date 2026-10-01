@@ -6,6 +6,7 @@ using namespace travelingsalesmansolver;
 
 const LkhOutput travelingsalesmansolver::lkh(
         const Instance& instance,
+        std::mt19937_64& generator,
         const LkhParameters& parameters,
         const Solution* initial_solution)
 {
@@ -49,8 +50,10 @@ const LkhOutput travelingsalesmansolver::lkh(
         parameters_file << "RUNS = " << parameters.runs << std::endl;
     if (!parameters.max_trials.empty())
         parameters_file << "MAX_TRIALS = " << parameters.max_trials << std::endl;
-    if (!parameters.seed.empty())
-        parameters_file << "SEED = " << parameters.seed << std::endl;
+    // LKH's seed is an 'unsigned int'.
+    parameters_file << "SEED = "
+        << std::uniform_int_distribution<unsigned int>(1, 2147483647)(generator)
+        << std::endl;
     if (!parameters.max_candidates.empty())
         parameters_file << "MAX_CANDIDATES = " << parameters.max_candidates << std::endl;
 

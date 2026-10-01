@@ -1,14 +1,14 @@
-#include "travelingsalesmansolver/algorithms/greedy.hpp"
+#include "travelingsalesmansolver/algorithms/greedy_edge.hpp"
 
 using namespace travelingsalesmansolver;
 
-const Output travelingsalesmansolver::greedy(
+const Output travelingsalesmansolver::greedy_edge(
         const Instance& instance,
-        const GreedyParameters& parameters,
+        const GreedyEdgeParameters& parameters,
         const CandidateLists* candidates)
 {
     return FUNCTION_WITH_DISTANCES(
-            greedy,
+            greedy_edge,
             instance.distances(),
             instance,
             parameters,

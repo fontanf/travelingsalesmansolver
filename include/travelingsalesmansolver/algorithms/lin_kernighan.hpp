@@ -3,7 +3,7 @@
 #include "travelingsalesmansolver/algorithm_formatter.hpp"
 #include "travelingsalesmansolver/solution_builder.hpp"
 #include "travelingsalesmansolver/lin_kernighan/engine.hpp"
-#include "travelingsalesmansolver/algorithms/greedy.hpp"
+#include "travelingsalesmansolver/algorithms/greedy_edge.hpp"
 #include "travelingsalesmansolver/candidates/alpha_nearness.hpp"
 
 namespace travelingsalesmansolver
@@ -60,9 +60,6 @@ struct LinKernighanParameters: Parameters
     /** Maximum length of each of the two segments swapped by a segment swap. */
     VertexId kick_segment_length = 50;
 
-    /** Seed. */
-    int seed = 0;
-
 
     virtual nlohmann::json to_json() const override
     {
@@ -79,7 +76,6 @@ struct LinKernighanParameters: Parameters
                 {"NonSequentialMoves", non_sequential_moves},
                 {"MaximumNumberOfTrials", maximum_number_of_trials},
                 {"KickSegmentLength", kick_segment_length},
-                {"Seed", seed},
                 });
         return json;
     }
@@ -102,7 +98,6 @@ struct LinKernighanParameters: Parameters
             << std::setw(width) << std::left << "Non-sequential moves: " << non_sequential_moves << std::endl
             << std::setw(width) << std::left << "Maximum number of trials: " << maximum_number_of_trials << std::endl
             << std::setw(width) << std::left << "Kick segment length: " << kick_segment_length << std::endl
-            << std::setw(width) << std::left << "Seed: " << seed << std::endl
             ;
     }
 };
@@ -112,7 +107,7 @@ struct LinKernighanParameters: Parameters
  * nearest neighbor candidates and the engine, minimizing the length of the
  * tour.
  *
- * 'initial_solution', if provided, is the initial tour (a 'greedy' tour is
+ * 'initial_solution', if provided, is the initial tour (a 'greedy_edge' tour is
  * built otherwise). It must be a feasible solution of the same 'instance'.
  *
  * 'candidates', if provided, are the candidate edges of each vertex, best
@@ -125,6 +120,7 @@ struct LinKernighanParameters: Parameters
  */
 const Output lin_kernighan(
         const Instance& instance,
+        std::mt19937_64& generator,
         const LinKernighanParameters& parameters = {},
         const Solution* initial_solution = nullptr,
         const CandidateLists* candidates = nullptr,
@@ -134,6 +130,7 @@ template <typename Distances>
 const Output lin_kernighan(
         const Distances& distances,
         const Instance& instance,
+        std::mt19937_64& generator,
         const LinKernighanParameters& parameters = {},
         const Solution* initial_solution = nullptr,
         const CandidateLists* candidates = nullptr,
@@ -206,6 +203,7 @@ template <typename Distances>
 const Output lin_kernighan(
         const Distances& distances,
         const Instance& instance,
+        std::mt19937_64& generator,
         const LinKernighanParameters& parameters,
         const Solution* initial_solution,
         const CandidateLists* candidates,
@@ -228,12 +226,12 @@ const Output lin_kernighan(
         for (VertexId pos = 0; pos < initial_solution->number_of_vertices(); ++pos)
             initial_tour.push_back(initial_solution->vertex_id(pos));
     } else {
-        GreedyParameters greedy_parameters;
-        greedy_parameters.verbosity_level = 0;
-        greedy_parameters.number_of_candidates = parameters.number_of_candidates;
-        Output greedy_output = greedy(distances, instance, greedy_parameters, &candidate_lists);
-        for (VertexId pos = 0; pos < greedy_output.solution.number_of_vertices(); ++pos)
-            initial_tour.push_back(greedy_output.solution.vertex_id(pos));
+        GreedyEdgeParameters greedy_edge_parameters;
+        greedy_edge_parameters.verbosity_level = 0;
+        greedy_edge_parameters.number_of_candidates = parameters.number_of_candidates;
+        Output greedy_edge_output = greedy_edge(distances, instance, greedy_edge_parameters, &candidate_lists);
+        for (VertexId pos = 0; pos < greedy_edge_output.solution.number_of_vertices(); ++pos)
+            initial_tour.push_back(greedy_edge_output.solution.vertex_id(pos));
     }
     lin_kernighan_engine::EngineParameters engine_parameters;
     engine_parameters.move_type = parameters.move_type;
@@ -243,11 +241,10 @@ const Output lin_kernighan(
     engine_parameters.non_sequential_moves = parameters.non_sequential_moves;
     engine_parameters.maximum_number_of_trials = parameters.maximum_number_of_trials;
     engine_parameters.kick_segment_length = parameters.kick_segment_length;
-    engine_parameters.seed = parameters.seed;
     engine_parameters.needs_to_end = [&parameters]() { return parameters.timer.needs_to_end(); };
 
     LinKernighanTspProblem<Distances> problem{distances, instance, algorithm_formatter, penalties};
-    lin_kernighan_engine::run(problem, engine_parameters, std::move(candidate_lists), initial_tour);
+    lin_kernighan_engine::run(problem, generator, engine_parameters, std::move(candidate_lists), initial_tour);
 
     algorithm_formatter.end();
     return output;
