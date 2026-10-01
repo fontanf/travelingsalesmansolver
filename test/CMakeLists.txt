@@ -43,3 +43,14 @@ target_link_libraries(TravelingSalesmanSolver_alpha_nearness_test
     TravelingSalesmanSolver_candidates
     GTest::gtest_main)
 gtest_discover_tests(TravelingSalesmanSolver_alpha_nearness_test)
+
+add_executable(TravelingSalesmanSolver_construction_test)
+target_sources(TravelingSalesmanSolver_construction_test PRIVATE
+    algorithms/construction_test.cpp)
+target_link_libraries(TravelingSalesmanSolver_construction_test
+    TravelingSalesmanSolver_random_permutation
+    TravelingSalesmanSolver_random_walk
+    TravelingSalesmanSolver_two_opt
+    TravelingSalesmanSolver_eax
+    GTest::gtest_main)
+gtest_discover_tests(TravelingSalesmanSolver_construction_test)

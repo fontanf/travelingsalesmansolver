@@ -1,8 +1,12 @@
 #include "travelingsalesmansolver/algorithms/lkh.hpp"
 #include "travelingsalesmansolver/algorithms/concorde.hpp"
-#include "travelingsalesmansolver/algorithms/greedy.hpp"
+#include "travelingsalesmansolver/algorithms/greedy_edge.hpp"
 #include "travelingsalesmansolver/algorithms/lin_kernighan.hpp"
 #include "travelingsalesmansolver/candidates/alpha_nearness.hpp"
+#include "travelingsalesmansolver/algorithms/eax.hpp"
+#include "travelingsalesmansolver/algorithms/random_permutation.hpp"
+#include "travelingsalesmansolver/algorithms/random_walk.hpp"
+#include "travelingsalesmansolver/algorithms/two_opt.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -92,7 +96,6 @@ Output run(
     std::string algorithm = vm["algorithm"].as<std::string>();
     if (algorithm == "lkh") {
         LkhParameters parameters;
-        parameters.seed = std::to_string(vm["seed"].as<Seed>());
         if (vm.count("candidate-set-type"))
             parameters.candidate_set_type = vm["candidate-set-type"].as<std::string>();
         if (vm.count("initial-period"))
@@ -102,24 +105,23 @@ Output run(
         if (vm.count("max-trials"))
             parameters.max_trials = vm["max-trials"].as<std::string>();
         read_args(parameters, vm);
-        return lkh(instance, parameters);
+        return lkh(instance, generator, parameters);
     } else if (algorithm == "concorde") {
         Parameters parameters;
         read_args(parameters, vm);
         return concorde(instance, parameters);
 
-    } else if (algorithm == "greedy") {
-        GreedyParameters parameters;
+    } else if (algorithm == "greedy-edge") {
+        GreedyEdgeParameters parameters;
         read_args(parameters, vm);
         if (vm.count("number-of-candidates"))
             parameters.number_of_candidates = vm["number-of-candidates"].as<VertexId>();
         std::unique_ptr<CandidateLists> candidates = compute_candidates(instance, vm);
-        return greedy(instance, parameters, candidates.get());
+        return greedy_edge(instance, parameters, candidates.get());
 
     } else if (algorithm == "lin-kernighan") {
         LinKernighanParameters parameters;
         read_args(parameters, vm);
-        parameters.seed = vm["seed"].as<Seed>();
         if (vm.count("number-of-candidates"))
             parameters.number_of_candidates = vm["number-of-candidates"].as<VertexId>();
         if (vm.count("maximum-depth"))
@@ -140,7 +142,49 @@ Output run(
             parameters.penalized_costs = vm["penalized-costs"].as<bool>();
         if (vm.count("ascent-initial-period"))
             parameters.ascent_initial_period = vm["ascent-initial-period"].as<int64_t>();
-        return lin_kernighan(instance, parameters);
+        return lin_kernighan(instance, generator, parameters);
+
+    } else if (algorithm == "eax") {
+        EaxParameters parameters;
+        if (vm.count("population-size"))
+            parameters.population_size = vm["population-size"].as<int>();
+        if (vm.count("number-of-children"))
+            parameters.number_of_children = vm["number-of-children"].as<int>();
+        if (vm.count("initial-tours"))
+            parameters.initial_tours = vm["initial-tours"].as<std::string>();
+        if (vm.count("initial-local-search"))
+            parameters.initial_local_search = vm["initial-local-search"].as<std::string>();
+        if (vm.count("number-of-candidates"))
+            parameters.number_of_candidates = vm["number-of-candidates"].as<VertexId>();
+        read_args(parameters, vm);
+        return eax(instance, generator, parameters);
+
+    } else if (algorithm == "random-permutation") {
+        RandomPermutationParameters parameters;
+        read_args(parameters, vm);
+        return random_permutation(instance, generator, parameters);
+
+    } else if (algorithm == "random-walk") {
+        RandomWalkParameters parameters;
+        read_args(parameters, vm);
+        if (vm.count("number-of-candidates"))
+            parameters.number_of_candidates = vm["number-of-candidates"].as<VertexId>();
+        if (vm.count("candidates"))
+            parameters.candidates = vm["candidates"].as<std::string>();
+        return random_walk(instance, generator, parameters);
+
+    } else if (algorithm == "two-opt") {
+        TwoOptParameters parameters;
+        read_args(parameters, vm);
+        if (vm.count("number-of-candidates"))
+            parameters.number_of_candidates = vm["number-of-candidates"].as<VertexId>();
+        std::unique_ptr<CandidateLists> candidates = compute_candidates(instance, vm);
+        return two_opt(
+                instance,
+                generator,
+                parameters,
+                (solution.feasible())? &solution: nullptr,
+                candidates.get());
 
     } else {
         throw std::invalid_argument(
@@ -173,8 +217,8 @@ int main(int argc, char *argv[])
         ("runs,", po::value<std::string>(), "set runs")
         ("max-trials,", po::value<std::string>(), "set max trials")
 
-        ("candidates,", po::value<std::string>(), "set candidates: nearest-neighbor or alpha-nearness (greedy, lin-kernighan)")
-        ("number-of-candidates,", po::value<VertexId>(), "set number of candidates (greedy, lin-kernighan)")
+        ("candidates,", po::value<std::string>(), "set candidates: nearest-neighbor or alpha-nearness (greedy-edge, lin-kernighan, random-walk, two-opt)")
+        ("number-of-candidates,", po::value<VertexId>(), "set number of candidates (greedy-edge, lin-kernighan, random-walk, two-opt, eax)")
         ("ascent-graph-number-of-nearest-neighbors,", po::value<VertexId>(), "set number of nearest neighbors of the graph of the ascent, -1 for the complete graph (alpha-nearness)")
         ("ascent-initial-period,", po::value<int64_t>(), "set initial period of the ascent (alpha-nearness)")
         ("penalized-costs,", po::value<bool>(), "guide the search with the costs penalized by the ascent of the alpha-nearness candidates (lin-kernighan)")
@@ -184,6 +228,10 @@ int main(int argc, char *argv[])
         ("restricted-search,", po::value<bool>(), "set restricted search (lin-kernighan)")
         ("non-sequential-moves,", po::value<bool>(), "set non-sequential moves (lin-kernighan)")
         ("maximum-depth,", po::value<int>(), "set maximum number of steps in a chain (lin-kernighan)")
+        ("population-size,", po::value<int>(), "set population size (eax)")
+        ("number-of-children,", po::value<int>(), "set number of children per generation (eax)")
+        ("initial-tours,", po::value<std::string>(), "set initial tours of the population: random-permutation or random-walk (eax)")
+        ("initial-local-search,", po::value<std::string>(), "set local search of the initial tours: 2-opt, lin-kernighan or none (eax)")
         ;
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);

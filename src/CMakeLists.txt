@@ -24,8 +24,12 @@ if(TRAVELINGSALESMANSOLVER_BUILD_MAIN)
   target_link_libraries(TravelingSalesmanSolver_main PUBLIC
       TravelingSalesmanSolver_lkh
       TravelingSalesmanSolver_concorde
-      TravelingSalesmanSolver_greedy
+      TravelingSalesmanSolver_greedy_edge
       TravelingSalesmanSolver_lin_kernighan
+      TravelingSalesmanSolver_eax
+      TravelingSalesmanSolver_random_permutation
+      TravelingSalesmanSolver_random_walk
+      TravelingSalesmanSolver_two_opt
       Boost::program_options)
   set_target_properties(TravelingSalesmanSolver_main PROPERTIES OUTPUT_NAME "travelingsalesmansolver")
   install(TARGETS TravelingSalesmanSolver_main)

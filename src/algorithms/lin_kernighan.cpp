@@ -4,6 +4,7 @@ using namespace travelingsalesmansolver;
 
 const Output travelingsalesmansolver::lin_kernighan(
         const Instance& instance,
+        std::mt19937_64& generator,
         const LinKernighanParameters& parameters,
         const Solution* initial_solution,
         const CandidateLists* candidates,
@@ -83,6 +84,7 @@ const Output travelingsalesmansolver::lin_kernighan(
             lin_kernighan,
             instance.distances(),
             instance,
+            generator,
             parameters,
             initial_solution,
             candidates,

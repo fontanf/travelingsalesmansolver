@@ -117,9 +117,6 @@ struct EngineParameters
     /** Maximum length of each of the two segments swapped by a segment swap. */
     VertexId kick_segment_length = 50;
 
-    /** Seed. */
-    uint64_t seed = 0;
-
     /** Should the search stop (time limit)? Checked between trials. */
     std::function<bool()> needs_to_end = []() { return false; };
 };
@@ -132,11 +129,12 @@ struct Engine
 
     Engine(
             const Problem& problem,
+            std::mt19937_64& generator,
             const EngineParameters& parameters):
         problem(problem),
         parameters(parameters),
         tour(std::vector<VertexId>{0}),
-        generator(parameters.seed)
+        generator(generator)
     {
     }
 
@@ -194,8 +192,8 @@ struct Engine
      */
     std::vector<std::array<VertexId, 4>> moves;
 
-    /** Random number generator. */
-    std::mt19937_64 generator;
+    /** Random number generator (the caller's). */
+    std::mt19937_64& generator;
 
     /** Queue of the active vertices, to be used as 't1'. */
     std::vector<VertexId> queue;
@@ -1399,12 +1397,13 @@ std::vector<VertexId> double_bridge_tour(
 template <typename Problem>
 std::vector<VertexId> run(
         const Problem& input_problem,
+        std::mt19937_64& generator,
         const EngineParameters& parameters,
         CandidateLists candidates,
         const std::vector<VertexId>& initial_tour)
 {
     using Objective = typename Problem::Objective;
-    Engine<Problem> engine(input_problem, parameters);
+    Engine<Problem> engine(input_problem, generator, parameters);
     Problem& problem = engine.problem;
     VertexId number_of_vertices = problem.number_of_vertices();
     engine.number_of_vertices = number_of_vertices;

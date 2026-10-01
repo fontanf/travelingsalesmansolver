@@ -4,6 +4,7 @@
 #include "travelingsalesmansolver/algorithm_formatter.hpp"
 
 #include <iomanip>
+#include <random>
 
 namespace travelingsalesmansolver
 {
@@ -21,9 +22,6 @@ struct LkhParameters: Parameters
 
     /** MAX_TRIALS */
     std::string max_trials;
-
-    /** SEED */
-    std::string seed;
 
     /** CANDIDATE_FILE content. */
     std::string candidate_file_content;
@@ -43,7 +41,6 @@ struct LkhParameters: Parameters
             << std::setw(width) << std::left << "Initial period:  " << initial_period << std::endl
             << std::setw(width) << std::left << "Runs:  " << runs << std::endl
             << std::setw(width) << std::left << "Max trials:  " << max_trials << std::endl
-            << std::setw(width) << std::left << "Seed:  " << seed << std::endl
             << std::setw(width) << std::left << "Has candidate flle content:  " << (!candidate_file_content.empty()) << std::endl
             << std::setw(width) << std::left << "Max candidates:  " << max_candidates << std::endl
             ;
@@ -57,7 +54,6 @@ struct LkhParameters: Parameters
                 {"InitialPeriod", initial_period},
                 {"Runs", runs},
                 {"MaxTrials", max_trials},
-                {"Seed", seed},
                 {"HasCandidateFileContent", (!candidate_file_content.empty())},
                 {"MaxCandidates", max_candidates},
                 });
@@ -74,8 +70,12 @@ struct LkhOutput: Output
     std::string candidate_file_content;
 };
 
+/**
+ * LKH, called through a system call; its 'SEED' is drawn from 'generator'.
+ */
 const LkhOutput lkh(
         const Instance& instance,
+        std::mt19937_64& generator,
         const LkhParameters& parameters = {},
         const Solution* initial_solution = nullptr);
 
