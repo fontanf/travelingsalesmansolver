@@ -1,9 +1,21 @@
 #include "travelingsalesmansolver/algorithms/eax.hpp"
 
+#include "travelingsalesmansolver/solution_builder.hpp"
+#include "travelingsalesmansolver/candidates/nearest_neighbor.hpp"
+#include "travelingsalesmansolver/candidates/alpha_nearness.hpp"
+#include "travelingsalesmansolver/algorithms/random_permutation.hpp"
+#include "travelingsalesmansolver/algorithms/two_opt.hpp"
+#include "travelingsalesmansolver/algorithms/random_walk.hpp"
+#include "travelingsalesmansolver/algorithms/lin_kernighan.hpp"
+
+#include <algorithm>
+#include <array>
 #include <cassert>
+#include <cmath>
+#include <numeric>
+#include <vector>
 
 using namespace travelingsalesmansolver;
-using namespace travelingsalesmansolver::eax_internal;
 
 namespace
 {
@@ -16,6 +28,113 @@ enum class Strategy
 
     /** Block2 strategy (stage II). */
     block2,
+};
+
+/** Tour: the two neighbors of each vertex, and the length. */
+struct Tour
+{
+    std::vector<std::array<VertexId, 2>> neighbors;
+
+    Distance length = 0;
+
+    /**
+     * Order of the vertices along the tour, and position of each vertex
+     * (valid if 'order_valid': computed when the tour is a first parent, and
+     * kept until it's modified).
+     */
+    std::vector<int32_t> order;
+    std::vector<int32_t> positions;
+    bool order_valid = false;
+};
+
+/**
+ * Number of individuals of the population containing each edge: for each
+ * vertex, the list of the other ends of its edges in the population, with
+ * their counts (a few entries per vertex).
+ */
+struct EdgeFrequencies
+{
+    std::vector<std::vector<std::pair<VertexId, int64_t>>> lists;
+};
+
+inline int64_t edge_frequency(
+        const EdgeFrequencies& edge_frequencies,
+        VertexId vertex_id_1,
+        VertexId vertex_id_2)
+{
+    for (const auto& entry: edge_frequencies.lists[vertex_id_1])
+        if (entry.first == vertex_id_2)
+            return entry.second;
+    return 0;
+}
+
+void add_directed_edge_frequency(
+        EdgeFrequencies& edge_frequencies,
+        VertexId vertex_id_1,
+        VertexId vertex_id_2,
+        int64_t delta)
+{
+    auto& list = edge_frequencies.lists[vertex_id_1];
+    for (size_t pos = 0; pos < list.size(); ++pos) {
+        if (list[pos].first == vertex_id_2) {
+            list[pos].second += delta;
+            if (list[pos].second == 0) {
+                list[pos] = list.back();
+                list.pop_back();
+            }
+            return;
+        }
+    }
+    list.push_back({vertex_id_2, delta});
+}
+
+void add_edge_frequency(
+        EdgeFrequencies& edge_frequencies,
+        VertexId vertex_id_1,
+        VertexId vertex_id_2,
+        int64_t delta)
+{
+    add_directed_edge_frequency(edge_frequencies, vertex_id_1, vertex_id_2, delta);
+    add_directed_edge_frequency(edge_frequencies, vertex_id_2, vertex_id_1, delta);
+}
+
+/** Edge, with its ends sorted. */
+struct Edge
+{
+    VertexId vertex_id_1 = -1;
+    VertexId vertex_id_2 = -1;
+
+    Edge() = default;
+
+    Edge(VertexId a, VertexId b):
+        vertex_id_1(std::min(a, b)),
+        vertex_id_2(std::max(a, b)) { }
+
+    bool operator<(const Edge& edge) const
+    {
+        return (vertex_id_1 != edge.vertex_id_1)?
+            vertex_id_1 < edge.vertex_id_1:
+            vertex_id_2 < edge.vertex_id_2;
+    }
+
+    bool operator==(const Edge& edge) const
+    {
+        return vertex_id_1 == edge.vertex_id_1 && vertex_id_2 == edge.vertex_id_2;
+    }
+};
+
+/** Offspring solution: the edges removed from and added to pA. */
+struct Offspring
+{
+    std::vector<Edge> removed_edges;
+
+    std::vector<Edge> added_edges;
+
+    /** Difference of tour length with pA. */
+    Distance length_difference = 0;
+
+    /** Evaluation (entropy-preserving selection). */
+    double evaluation = 0;
 };
 
 struct NeighborList
@@ -41,7 +160,6 @@ struct EaxData
         algorithm_formatter(algorithm_formatter),
         output(output),
         number_of_vertices(instance.number_of_vertices()),
-        edge_frequencies(number_of_vertices),
         remaining_a(number_of_vertices),
         remaining_b(number_of_vertices),
         trace_stamps(number_of_vertices, 0),
@@ -313,12 +431,13 @@ void initialize_population(EaxData<Distances>& data)
             data.algorithm_formatter.update_solution(solution, "initial solution " + std::to_string(i));
         }
     }
+    data.edge_frequencies.lists.resize(data.number_of_vertices);
     // Each edge is counted from its smaller end.
     for (const Tour& tour: data.population)
         for (VertexId vertex_id = 0; vertex_id < data.number_of_vertices; ++vertex_id)
             for (VertexId neighbor_id: tour.neighbors[vertex_id])
                 if (vertex_id < neighbor_id)
-                    data.edge_frequencies.add(vertex_id, neighbor_id, 1);
+                    add_edge_frequency(data.edge_frequencies, vertex_id, neighbor_id, 1);
 }
 
 /*
@@ -916,12 +1035,12 @@ void build_offspring(
     double entropy_difference = 0;
     for (const Edge& edge: removed) {
         length_difference -= distance(data, edge.vertex_id_1, edge.vertex_id_2);
-        int64_t frequency = data.edge_frequencies.get(edge.vertex_id_1, edge.vertex_id_2);
+        int64_t frequency = edge_frequency(data.edge_frequencies, edge.vertex_id_1, edge.vertex_id_2);
         entropy_difference += entropy_term(data, frequency - 1) - entropy_term(data, frequency);
     }
     for (const Edge& edge: added) {
         length_difference += distance(data, edge.vertex_id_1, edge.vertex_id_2);
-        int64_t frequency = data.edge_frequencies.get(edge.vertex_id_1, edge.vertex_id_2);
+        int64_t frequency = edge_frequency(data.edge_frequencies, edge.vertex_id_1, edge.vertex_id_2);
         entropy_difference += entropy_term(data, frequency + 1) - entropy_term(data, frequency);
     }
     offspring.length_difference = length_difference;
@@ -953,7 +1072,7 @@ void apply_offspring(
                 neighbors[1] = -1;
             }
         }
-        data.edge_frequencies.add(edge.vertex_id_1, edge.vertex_id_2, -1);
+        add_edge_frequency(data.edge_frequencies, edge.vertex_id_1, edge.vertex_id_2, -1);
     }
     for (const Edge& edge: offspring.added_edges) {
         for (auto [a, b]: {std::pair{edge.vertex_id_1, edge.vertex_id_2}, std::pair{edge.vertex_id_2, edge.vertex_id_1}}) {
@@ -964,7 +1083,7 @@ void apply_offspring(
                 neighbors[1] = b;
             }
         }
-        data.edge_frequencies.add(edge.vertex_id_1, edge.vertex_id_2, 1);
+        add_edge_frequency(data.edge_frequencies, edge.vertex_id_1, edge.vertex_id_2, 1);
     }
     tour.length += offspring.length_difference;
     tour.order_valid = false;

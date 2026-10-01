@@ -1,19 +1,8 @@
 #pragma once
 
 #include "travelingsalesmansolver/algorithm_formatter.hpp"
-#include "travelingsalesmansolver/solution_builder.hpp"
-#include "travelingsalesmansolver/candidates/nearest_neighbor.hpp"
-#include "travelingsalesmansolver/algorithms/random_permutation.hpp"
-#include "travelingsalesmansolver/algorithms/two_opt.hpp"
-#include "travelingsalesmansolver/algorithms/random_walk.hpp"
-#include "travelingsalesmansolver/algorithms/lin_kernighan.hpp"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <numeric>
 #include <random>
-#include <vector>
 
 namespace travelingsalesmansolver
 {
@@ -115,118 +104,5 @@ const Output eax(
         const Instance& instance,
         std::mt19937_64& generator,
         const EaxParameters& parameters = {});
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
-namespace eax_internal
-{
-
-/** Tour: the two neighbors of each vertex, and the length. */
-struct Tour
-{
-    std::vector<std::array<VertexId, 2>> neighbors;
-
-    Distance length = 0;
-
-    /**
-     * Order of the vertices along the tour, and position of each vertex
-     * (valid if 'order_valid': computed when the tour is a first parent, and
-     * kept until it's modified).
-     */
-    std::vector<int32_t> order;
-    std::vector<int32_t> positions;
-    bool order_valid = false;
-};
-
-/**
- * Number of individuals of the population containing each edge: for each
- * vertex, the list of the other ends of its edges in the population, with
- * their counts (a few entries per vertex).
- */
-class EdgeFrequencies
-{
-
-public:
-
-    EdgeFrequencies(VertexId number_of_vertices):
-        lists_(number_of_vertices) { }
-
-    inline int64_t get(VertexId vertex_id_1, VertexId vertex_id_2) const
-    {
-        for (const auto& entry: lists_[vertex_id_1])
-            if (entry.first == vertex_id_2)
-                return entry.second;
-        return 0;
-    }
-
-    void add(VertexId vertex_id_1, VertexId vertex_id_2, int64_t delta)
-    {
-        add_directed(vertex_id_1, vertex_id_2, delta);
-        add_directed(vertex_id_2, vertex_id_1, delta);
-    }
-
-private:
-
-    void add_directed(VertexId vertex_id_1, VertexId vertex_id_2, int64_t delta)
-    {
-        auto& list = lists_[vertex_id_1];
-        for (size_t pos = 0; pos < list.size(); ++pos) {
-            if (list[pos].first == vertex_id_2) {
-                list[pos].second += delta;
-                if (list[pos].second == 0) {
-                    list[pos] = list.back();
-                    list.pop_back();
-                }
-                return;
-            }
-        }
-        list.push_back({vertex_id_2, delta});
-    }
-
-    std::vector<std::vector<std::pair<VertexId, int64_t>>> lists_;
-};
-
-/** Edge, with its ends sorted. */
-struct Edge
-{
-    VertexId vertex_id_1 = -1;
-    VertexId vertex_id_2 = -1;
-
-    Edge() = default;
-
-    Edge(VertexId a, VertexId b):
-        vertex_id_1(std::min(a, b)),
-        vertex_id_2(std::max(a, b)) { }
-
-    bool operator<(const Edge& edge) const
-    {
-        return (vertex_id_1 != edge.vertex_id_1)?
-            vertex_id_1 < edge.vertex_id_1:
-            vertex_id_2 < edge.vertex_id_2;
-    }
-
-    bool operator==(const Edge& edge) const
-    {
-        return vertex_id_1 == edge.vertex_id_1 && vertex_id_2 == edge.vertex_id_2;
-    }
-};
-
-/** Offspring solution: the edges removed from and added to pA. */
-struct Offspring
-{
-    std::vector<Edge> removed_edges;
-
-    std::vector<Edge> added_edges;
-
-    /** Difference of tour length with pA. */
-    Distance length_difference = 0;
-
-    /** Evaluation (entropy-preserving selection). */
-    double evaluation = 0;
-};
-
-}
 
 }
