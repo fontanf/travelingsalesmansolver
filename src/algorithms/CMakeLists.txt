@@ -73,6 +73,7 @@ target_include_directories(TravelingSalesmanSolver_eax PUBLIC
     ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(TravelingSalesmanSolver_eax PUBLIC
     TravelingSalesmanSolver_traveling_salesman
+    TravelingSalesmanSolver_candidates
     TravelingSalesmanSolver_random_permutation
     TravelingSalesmanSolver_random_walk
     TravelingSalesmanSolver_two_opt

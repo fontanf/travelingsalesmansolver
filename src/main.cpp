@@ -146,17 +146,19 @@ Output run(
 
     } else if (algorithm == "eax") {
         EaxParameters parameters;
+        read_args(parameters, vm);
         if (vm.count("population-size"))
             parameters.population_size = vm["population-size"].as<int>();
         if (vm.count("number-of-children"))
             parameters.number_of_children = vm["number-of-children"].as<int>();
+        if (vm.count("stage-2"))
+            parameters.stage_2 = vm["stage-2"].as<bool>();
         if (vm.count("initial-tours"))
             parameters.initial_tours = vm["initial-tours"].as<std::string>();
         if (vm.count("initial-local-search"))
             parameters.initial_local_search = vm["initial-local-search"].as<std::string>();
         if (vm.count("number-of-candidates"))
             parameters.number_of_candidates = vm["number-of-candidates"].as<VertexId>();
-        read_args(parameters, vm);
         return eax(instance, generator, parameters);
 
     } else if (algorithm == "random-permutation") {
@@ -230,6 +232,7 @@ int main(int argc, char *argv[])
         ("maximum-depth,", po::value<int>(), "set maximum number of steps in a chain (lin-kernighan)")
         ("population-size,", po::value<int>(), "set population size (eax)")
         ("number-of-children,", po::value<int>(), "set number of children per generation (eax)")
+        ("stage-2,", po::value<bool>(), "run the second stage, block2 strategy (eax)")
         ("initial-tours,", po::value<std::string>(), "set initial tours of the population: random-permutation or random-walk (eax)")
         ("initial-local-search,", po::value<std::string>(), "set local search of the initial tours: 2-opt, lin-kernighan or none (eax)")
         ;
