@@ -15,6 +15,7 @@
 #include <numeric>
 #include <random>
 #include <string>
+#include <type_traits>
 #include <unordered_set>
 #include <vector>
 
@@ -61,6 +62,9 @@
  * - 'std::vector<VertexId> trial_start_tour(Engine&, const
  *   std::vector<VertexId>& best_tour)': starting tour of a random-walk
  *   trial ('random_walk_tour' is the default one).
+ * - Optionally, 'std::vector<VertexId> kick_tour(Engine&, const
+ *   std::vector<VertexId>& best_tour)': starting tour of a trial with kicks
+ *   ("double-bridge" perturbation), or an empty tour for a double bridge.
  * - 'void report(const std::vector<VertexId>& tour, const std::string&
  *   comment)': a new best tour.
  */
@@ -90,7 +94,8 @@ struct EngineParameters
      *   ('Problem::trial_start_tour'), re-optimizing the vertices whose edges
      *   differ from the best tour, then merged with the best tour;
      * - "double-bridge" (as LKH's 'SPECIAL' settings): trials starting from
-     *   the best tour perturbed by a random double bridge;
+     *   the best tour perturbed by a random double bridge, or by the
+     *   problem's own kick if it provides one ('Problem::kick_tour');
      * - "segment-swap": perturb the current tour locally (a random segment
      *   swap) and re-optimize around it; keep the result if it isn't worse.
      */
@@ -1382,6 +1387,33 @@ std::vector<VertexId> double_bridge_tour(
     return tour;
 }
 
+/** Does the problem provide its own kicks ('Problem::kick_tour')? */
+template <typename Problem, typename = void>
+struct HasKickTour: std::false_type { };
+
+template <typename Problem>
+struct HasKickTour<Problem, std::void_t<decltype(std::declval<Problem&>().kick_tour(
+            std::declval<Engine<Problem>&>(),
+            std::declval<const std::vector<VertexId>&>()))>>: std::true_type { };
+
+/**
+ * Starting tour of a trial with kicks: the problem's kick
+ * ('Problem::kick_tour'), if it provides one and returns a non-empty tour,
+ * else a double bridge.
+ */
+template <typename Problem>
+std::vector<VertexId> kick_start_tour(
+        Engine<Problem>& engine,
+        const std::vector<VertexId>& best_tour)
+{
+    if constexpr (HasKickTour<Problem>::value) {
+        std::vector<VertexId> tour = engine.problem.kick_tour(engine, best_tour);
+        if (!tour.empty())
+            return tour;
+    }
+    return double_bridge_tour(engine, best_tour);
+}
+
 /*
  * Run
  */
@@ -1515,7 +1547,7 @@ std::vector<VertexId> run(
                 ++trial_id) {
             std::vector<VertexId> start_tour = (walks)?
                 problem.trial_start_tour(engine, best_tour):
-                double_bridge_tour(engine, best_tour);
+                kick_start_tour(engine, best_tour);
             set_tour(engine, start_tour);
             // Only the vertices whose edges differ from the best tour.
             for (VertexId pos = 0; pos < number_of_vertices; ++pos) {
