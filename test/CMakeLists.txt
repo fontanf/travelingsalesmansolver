@@ -54,3 +54,11 @@ target_link_libraries(TravelingSalesmanSolver_construction_test
     TravelingSalesmanSolver_eax
     GTest::gtest_main)
 gtest_discover_tests(TravelingSalesmanSolver_construction_test)
+
+add_executable(TravelingSalesmanSolver_distances_test)
+target_sources(TravelingSalesmanSolver_distances_test PRIVATE
+    distances/distances_test.cpp)
+target_link_libraries(TravelingSalesmanSolver_distances_test
+    TravelingSalesmanSolver_distances
+    GTest::gtest_main)
+gtest_discover_tests(TravelingSalesmanSolver_distances_test)

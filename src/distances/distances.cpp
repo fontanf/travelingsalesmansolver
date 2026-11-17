@@ -4,11 +4,17 @@ using namespace travelingsalesmansolver;
 
 void Distances::compute_distances_explicit() const
 {
+    if (distances_explicit_ != nullptr)
+        return;
     FUNCTION_WITH_DISTANCES_0(this->compute_distances_explicit, *this);
 }
 
 void Distances::compute_distances_explicit_triangle() const
 {
+    if (distances_explicit_ != nullptr
+            || distances_explicit_triangle_ != nullptr) {
+        return;
+    }
     FUNCTION_WITH_DISTANCES_0(this->compute_distances_explicit_triangle, *this);
 }
 
