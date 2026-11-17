@@ -99,12 +99,26 @@ public:
      * Constructors and destructor
      */
 
+    /**
+     * Compute the full distance matrix ('distances_explicit()').
+     *
+     * It does nothing if the matrix has already been computed: the current
+     * one might be referenced, e.g., by an algorithm called with the
+     * concrete distances through 'FUNCTION_WITH_DISTANCES'.
+     */
     void compute_distances_explicit() const;
 
     template <typename T>
     void compute_distances_explicit(
             const T& distances) const;
 
+    /**
+     * Compute the triangular distance matrix
+     * ('distances_explicit_triangle()').
+     *
+     * It does nothing if the full or the triangular matrix has already been
+     * computed (see 'compute_distances_explicit()').
+     */
     void compute_distances_explicit_triangle() const;
 
     template <typename T>
